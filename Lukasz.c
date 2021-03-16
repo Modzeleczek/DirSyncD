@@ -44,7 +44,7 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
     
     int remainingArguments = argc - optind; // wyznaczamy liczbę argumentów, które nie są opcjami
     if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ściezki źródłowej i docelowej), to kończymy
-        return -3;
+        return -5;
     // optind - indeks pierwszego argumentu niesparsowanego przez getopt
     int i;
     for(i = 0; i < remainingArguments; ++i) // iterujemy po ścieżkach, aby sprawdzić, czy katalogi istnieją; są tylko 2 ścieżki: źródłowa i docelowa
@@ -53,12 +53,12 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
         if(d == NULL) // błąd podczas otwierania
         {
             perror("opendir");
-            return -(5 + i);
+            return -(6 + i);
         }
         if(closedir(d) == -1) // zamykamy katalog źródłowy
         {
             perror("closedir");
-            return -(6 + i);
+            return -(7 + i);
         }
     }
     *source = argv[optind];
