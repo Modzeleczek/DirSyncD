@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <stdio.h>
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
@@ -63,4 +64,9 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
     *source = argv[optind];
     *destination = argv[optind + 1];
     return 0;
+}
+
+void printUsage()
+{
+    printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] sciezka_zrodlowa sciezka_docelowa\n");
 }
