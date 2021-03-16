@@ -1,10 +1,12 @@
 /*
-opcje:
--i <wartosc> - czas spania
--R - rekurencyjna synchronizacja katalogów
+argumenty:
 sciezka_zrodlowa - ścieżka do katalogu, z którego kopiujemy
 sciezka_docelowa - ścieżka do katalogu, do którego kopiujemy
-sposób użycia: DirSyncD [-i <wartosc>] [-R] sciezka_zrodlowa sciezka_docelowa
+dodatkowe opcje:
+-i <wartosc> - czas spania
+-R - rekurencyjna synchronizacja katalogów
+sposób użycia:
+DirSyncD [-i <wartosc>] [-R] sciezka_zrodlowa sciezka_docelowa
 */
 
 #include "Anna.h"
