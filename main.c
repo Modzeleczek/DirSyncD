@@ -27,12 +27,12 @@ int main(int argc, char **argv)
     }
     if(directoryValid(source) < 0) // jeżeli operacje na katalogu źródłowym powodują błąd, to kończymy
     {
-        perror("source"); // wypisujemy błąd umieszczony w zmiennej errno
+        perror(source); // wypisujemy błąd umieszczony w zmiennej errno
         return -2;
     }
     if(directoryValid(destination) < 0) // jeżeli operacje na katalogu docelowym powodują błąd, to kończymy
     {
-        perror("destination"); // wypisujemy błąd umieszczony w zmiennej errno
+        perror(destination); // wypisujemy błąd umieszczony w zmiennej errno
         return -3;
     }
 
