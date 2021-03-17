@@ -24,4 +24,15 @@ wypisuje sposób użycia programu na stdout
 */
 void printUsage();
 
+/*
+odczytuje:
+path - ścieżka do katalogu
+
+zwraca:
+-1, jeżeli wystąpił błąd podczas otwierania katalogu
+-2, jeżeli wystąpił błąd podczas zamykania katalogu
+0, jeżeli nie wystąpił błąd
+*/
+int directoryValid(const char *path);
+
 #endif
