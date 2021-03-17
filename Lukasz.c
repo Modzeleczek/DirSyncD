@@ -46,21 +46,6 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
     if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ściezki źródłowej i docelowej), to kończymy
         return -5;
     // optind - indeks pierwszego argumentu niesparsowanego przez getopt
-    int i;
-    for(i = 0; i < remainingArguments; ++i) // iterujemy po ścieżkach, aby sprawdzić, czy katalogi istnieją; są tylko 2 ścieżki: źródłowa i docelowa
-    {
-        DIR *d = opendir(argv[optind + i]); // otwieramy katalog; i = 0 - katalog źródłowy; i = 1 - katalog docelowy
-        if(d == NULL) // błąd podczas otwierania
-        {
-            perror("opendir");
-            return -(6 + i);
-        }
-        if(closedir(d) == -1) // zamykamy katalog źródłowy
-        {
-            perror("closedir");
-            return -(7 + i);
-        }
-    }
     *source = argv[optind];
     *destination = argv[optind + 1];
     return 0;
@@ -69,4 +54,14 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
 void printUsage()
 {
     printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] sciezka_zrodlowa sciezka_docelowa\n");
+}
+
+int directoryValid(const char *path)
+{
+    DIR *d = opendir(path); // otwieramy katalog
+    if(d == NULL) // jeżeli błąd podczas otwierania (m. in. kiedy katalog nie istnieje)
+        return -1;
+    if(closedir(d) == -1) // zamykamy katalog; jeżeli błąd podczas zamykania
+        return -2;
+    return 0; // katalog istnieje i operacje na nim nie powodują błędów
 }
