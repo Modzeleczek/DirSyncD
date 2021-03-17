@@ -13,6 +13,8 @@ DirSyncD [-i <wartosc>] [-R] sciezka_zrodlowa sciezka_docelowa
 #include "Lukasz.h"
 #include "Mariusz.h"
 
+#include <stdio.h>
+
 int main(int argc, char **argv)
 {
     char *source, *destination;
@@ -22,6 +24,16 @@ int main(int argc, char **argv)
     {
         printUsage();
         return -1;
+    }
+    if(directoryValid(source) < 0) // jeżeli operacje na katalogu źródłowym powodują błąd, to kończymy
+    {
+        perror("source"); // wypisujemy błąd umieszczony w zmiennej errno
+        return -2;
+    }
+    if(directoryValid(destination) < 0) // jeżeli operacje na katalogu docelowym powodują błąd, to kończymy
+    {
+        perror("destination"); // wypisujemy błąd umieszczony w zmiennej errno
+        return -3;
     }
 
     return 0;
