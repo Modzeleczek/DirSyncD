@@ -81,7 +81,7 @@ int directoryValid(const char *path)
 
 // Love R. - "Linux. Programowanie systemowe." strona 177
 // tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
-void startDaemon()
+void startDaemon(char *source, char *destination, unsigned int interval, char recursive, unsigned long long threshold)
 {
     pid_t pid = fork(); // tworzymy proces potomny
     if(pid == -1) // błąd wywołania fork jeszcze w procesie rodzicielskim; nie powstał proces potomny

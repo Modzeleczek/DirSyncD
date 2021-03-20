@@ -39,6 +39,6 @@ int directoryValid(const char *path);
 /*
 
 */
-void startDaemon();
+void startDaemon(char *source, char *destination, unsigned int interval, char recursive, unsigned long long threshold);
 
 #endif
