@@ -3,10 +3,11 @@ argumenty:
 sciezka_zrodlowa - ścieżka do katalogu, z którego kopiujemy
 sciezka_docelowa - ścieżka do katalogu, do którego kopiujemy
 dodatkowe opcje:
--i <wartosc> - czas spania
+-i <czas_spania> - czas spania
 -R - rekurencyjna synchronizacja katalogów
+-t <prog_duzego_pliku> - minimalny rozmiar pliku, żeby był on potraktowany jako duży
 sposób użycia:
-DirSyncD [-i <wartosc>] [-R] sciezka_zrodlowa sciezka_docelowa
+DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa
 */
 
 #include "Anna.h"
@@ -20,7 +21,8 @@ int main(int argc, char **argv)
     char *source, *destination;
     unsigned int interval;
     char recursive;
-    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0) // jeżeli błąd, to kończymy
+    unsigned long long threshold;
+    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive, &threshold) < 0) // jeżeli błąd, to kończymy
     {
         printUsage();
         return -1;

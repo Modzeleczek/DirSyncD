@@ -12,12 +12,13 @@ source - ścieżka źródłowa
 destination - ścieżka docelowa
 interval - czas spania w sekundach
 recursive - rekurecyjna synchronizacja katalogów
+threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 
 zwraca:
 < 0, jeżeli wystąpił błąd
 0, jeżeli nie wystąpił błąd
 */
-int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive);
+int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive, unsigned long long *threshold);
 
 /*
 wypisuje sposób użycia programu na stdout

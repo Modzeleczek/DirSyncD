@@ -6,18 +6,20 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <limits.h>
 
-int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
+int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive, unsigned long long *threshold)
 {
     // parsujemy dodatkowe opcje i argumenty programu
     if(argc <= 1)
         return -1;
     *interval = 5 * 60; // domyślny czas spania: 5*60 s = 5 min
     *recursive = 0; // domyślnie brak rekurencyjnego synchronizowania katalogów
+    *threshold = ULLONG_MAX; // domyślnie próg dużego pliku wynosi 2^64 - 1 bajtów; jeżeli podamy opcję -t 4096, to pliki o rozmiarze >= 4096 B będą czytane mmapem i zapisywane w folderze docelowym writem
 
     int option;
     // umieszczamy ':' na początku __shortopts, aby program mógł rozróżniać między '?' (nieznanym argumentem) i ':' (brakiem podania wartości dla opcji)
-    while((option = getopt(argc, argv, ":Ri:")) != -1)
+    while((option = getopt(argc, argv, ":Ri:t:")) != -1)
     {
         switch(option)
         {
@@ -27,6 +29,10 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
             case 'i':
                 if(sscanf(optarg, "%u", interval) < 1) // ciąg znaków optarg jest czasem spania w sekundach; zamieniamy ciąg znaków na unsigned int; jeżeli sscanf nie wypełnił poprawnie zmiennej interval, to wartość przekazana do programu ma niepoprawny format 
                     return -2;
+                break;
+            case 't':
+                if(sscanf(optarg, "%llu", threshold) < 1) // ciąg znaków optarg jest progiem dużego pliku; zamieniamy ciąg znaków na unsigned long long; jeżeli sscanf nie wypełnił poprawnie zmiennej threshold, to wartość przekazana do programu ma niepoprawny format
+                    return -3;
                 break;
             case ':':
                 printf("opcja wymaga podania wartosci\n");
@@ -54,7 +60,7 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
 
 void printUsage()
 {
-    printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] sciezka_zrodlowa sciezka_docelowa\n");
+    printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
 }
 
 int directoryValid(const char *path)
