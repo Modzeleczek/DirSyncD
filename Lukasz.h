@@ -37,7 +37,12 @@ zwraca:
 int directoryValid(const char *path);
 
 /*
-
+odczytuje:
+source - ścieżka źródłowa
+destination - ścieżka docelowa
+interval - czas spania w sekundach
+recursive - rekurecyjna synchronizacja katalogów
+threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 */
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive, unsigned long long threshold);
 
