@@ -25,26 +25,27 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
                 *recursive = (char)1; // rekurencyjna synchronizacja katalogów
                 break;
             case 'i':
-                sscanf(optarg, "%u", interval); // ciąg znaków optarg jest czasem spania w sekundach; zamieniamy ciąg znaków na unsigned int
+                if(sscanf(optarg, "%u", interval) < 1) // ciąg znaków optarg jest czasem spania w sekundach; zamieniamy ciąg znaków na unsigned int; jeżeli sscanf nie wypełnił poprawnie zmiennej interval, to wartość przekazana do programu ma niepoprawny format 
+                    return -2;
                 break;
             case ':':
                 printf("opcja wymaga podania wartosci\n");
-                return -2;
+                return -4;
                 break;
             case '?':
                 printf("nieznana opcja: %c\n", optopt);
-                return -3;
+                return -5;
                 break;
             default:
                 printf("blad");
-                return -4;
+                return -6;
                 break;
         }
     }
     
     int remainingArguments = argc - optind; // wyznaczamy liczbę argumentów, które nie są opcjami
     if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ściezki źródłowej i docelowej), to kończymy
-        return -5;
+        return -7;
     // optind - indeks pierwszego argumentu niesparsowanego przez getopt
     *source = argv[optind];
     *destination = argv[optind + 1];
