@@ -36,4 +36,9 @@ zwraca:
 */
 int directoryValid(const char *path);
 
+/*
+
+*/
+void startDaemon();
+
 #endif
