@@ -7,6 +7,12 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <limits.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <linux/fs.h>
+#include <signal.h>
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive, unsigned long long *threshold)
 {
@@ -71,4 +77,36 @@ int directoryValid(const char *path)
     if(closedir(d) == -1) // zamykamy katalog; jeżeli błąd podczas zamykania
         return -2;
     return 0; // katalog istnieje i operacje na nim nie powodują błędów
+}
+
+// Love R. - "Linux. Programowanie systemowe." strona 177
+// tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
+void startDaemon()
+{
+    pid_t pid = fork(); // tworzymy proces potomny
+    if(pid == -1) // błąd wywołania fork jeszcze w procesie rodzicielskim; nie powstał proces potomny
+    {
+        perror("fork");
+        exit(-1); // zamykamy proces rodzicielski ze statusem -1 (błąd)
+    }
+    else if(pid > 0) // w procesie rozdzicielskim zmienna pid ma wartość równą ID (PID) utworzonego procesu potomnego
+    {
+        printf("PID procesu potomnego: %i\n", pid); // wypisujemy PID procesu potomnego - przyszłego demona
+        exit(0); // zamykamy proces rodzicielski ze statusem 0 (brak błędów)
+    }
+    
+    // poniższy kod wykonuje się w procesie potomnym, bo w nim pid == 0; przekształcamy proces potomny w demona
+    if(setsid() == -1) // tworzymy nową sesję i grupę procesów
+        exit(-2); // zamykamy proces potomny ze statusem -2 (błąd); nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
+    if(chdir("/") == -1) // ustawiamy katalog roboczy na /
+        exit(-3); // zamykamy proces potomny ze statusem -3 (błąd)
+    int i;
+    for(i = 0; i < 1023; ++i) // zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2) i dalsze deskryptory - łącznie od 0 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
+        close(i);
+    // przeadresowujemy deskryptory 0, 1, 2 na /dev/null
+    open("/dev/null", O_RDWR); // deskryptor 0 (stdin) wskazuje teraz na /dev/null
+    dup(0); // deskryptor 1 (stdout) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+    dup(0); // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+
+    // w tym momencie proces potomny jest już demonem
 }
