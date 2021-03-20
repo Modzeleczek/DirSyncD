@@ -38,5 +38,7 @@ int main(int argc, char **argv)
         return -3;
     }
 
-    return 0;
+    startDaemon(); // program ze startDaemon już nie wraca do maina
+
+    return 0; // ani proces rodzicielski ani potomny nie dochodzą do tego miejsca, ale piszemy dla zasady, bo main zwraca int
 }
