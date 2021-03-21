@@ -79,6 +79,9 @@ int directoryValid(const char *path)
     return 0; // katalog istnieje i operacje na nim nie powodują błędów
 }
 
+void handler(int signo) // funkcja obsługi sygnału SIGUSR1; nie musi nic robić, bo służy tylko do przerwania spania - powrót procesu demona ze stanu oczekiwania do stanu gotowego
+{ }
+
 // Love R. - "Linux. Programowanie systemowe." strona 177
 // tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive, unsigned long long threshold)
