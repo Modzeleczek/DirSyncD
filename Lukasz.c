@@ -112,4 +112,10 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
     dup(0); // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
 
     // w tym momencie proces potomny jest już demonem
+    if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
+    {
+        // fprintf(stderr, "nie mozna obsluzyc sygnalu SIGINT1\n"); // demon ma deskryptor 2 przeadresowany na /dev/null, więc nie możemy pisać do stderr
+        exit(-3); // zamykamy proces demona ze statusem -3 (błąd)
+    }
+    exit(0); // zamykamy proces demona ze statusem 0 (brak błędów)
 }
