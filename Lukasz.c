@@ -97,9 +97,9 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
     
     // poniższy kod wykonuje się w procesie potomnym, bo w nim pid == 0; przekształcamy proces potomny w demona
     if(setsid() == -1) // tworzymy nową sesję i grupę procesów
-        exit(-2); // zamykamy proces potomny ze statusem -2 (błąd); nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
+        exit(-1); // zamykamy proces potomny ze statusem -1 (błąd); nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
     if(chdir("/") == -1) // ustawiamy katalog roboczy na /
-        exit(-3); // zamykamy proces potomny ze statusem -3 (błąd)
+        exit(-2); // zamykamy proces potomny ze statusem -2 (błąd)
     int i;
     for(i = 0; i < 1023; ++i) // zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2) i dalsze deskryptory - łącznie od 0 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
         close(i);
