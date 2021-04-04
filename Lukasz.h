@@ -2,6 +2,8 @@
 #ifndef LUKASZ_H
 #define LUKASZ_H
 
+#include <dirent.h>
+
 /*
 odczytuje:
 argc - liczba parametrów programu (opcji i argumentów razem)
@@ -57,5 +59,11 @@ odczytuje:
 l - lista jednokierunkowa
 */
 void initialize(list *l);
+/*
+odczytuje:
+l - lista jednokierunkowa
+newEntry - element katalogu, który dodajemy na koniec listy
+*/
+void pushBack(list *l, struct dirent *newEntry);
 
 #endif

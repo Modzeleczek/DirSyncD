@@ -33,6 +33,23 @@ void initialize(list *l)
     l->first = l->last = NULL;
     l->count = 0;
 }
+void pushBack(list *l, struct dirent *newEntry)
+{
+    element *new = malloc(sizeof(element));
+    new->entry = newEntry;
+    new->next = NULL;
+    if(l->first == NULL) // jeżeli lista jest pusta, to first i last są NULLami
+    {
+        l->first = new;
+        l->last = new;
+    }
+    else // jeżeli lista nie jest pusta, to ani first ani last nie są NULLami
+    {
+        l->last->next = new; // ustawiamy aktualnemu lastowi nowy jako następny
+        l->last = new; // przestawiamy aktualny last na nowy
+    }
+    ++l->count;
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
