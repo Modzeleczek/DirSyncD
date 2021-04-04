@@ -218,4 +218,38 @@ zwraca:
 */
 int listFilesAndDirectories(DIR *dir, list *files, list *dirs);
 
+/*
+odczytuje:
+srcDirPath - ścieżka do katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+srcDirPathLength - długość w bajtach ścieżki do katalogu źródłowego
+filesSrc - lista plików znajdujących się w katalogu źródłowym
+dstDirPath - ścieżka do katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+dstDirPathLength - długość w bajtach ścieżki do katalogu docelowego
+filesDst - lista plików znajdujących się w katalogu docelowym
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst);
+/*
+odczytuje:
+srcDirPath - ścieżka do katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+srcDirPathLength - długość w bajtach ścieżki do katalogu źródłowego
+filesSrc - lista podkatalogów znajdujących się w katalogu źródłowym
+dstDirPath - ścieżka do katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+dstDirPathLength - długość w bajtach ścieżki do katalogu docelowego
+filesDst - lista podkatalogów znajdujących się w katalogu docelowym
+
+zapisuje:
+isReady - tablica boolowska o długości równej liczbie podkatalogów w katalogu docelowym; jeżeli i-ty podkatalog z listy filesSrc nie istnieje w katalogu docelowym i:
+- nie uda się go utworzyć, to isReady[i] == 0
+- uda się go utworzyć, to isReady[i] == 1
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst, char *isReady);
+
 #endif

@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <syslog.h>
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
 #define BUFFERSIZE 4096
@@ -408,6 +409,237 @@ int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
     }
     if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
         return -1;
+    return 0;
+}
+
+// jeżeli inode (i-węzeł, czyli fizyczny plik w pamięci masowej) ma w katalogu źródłowym więcej niż 1 nazwę, to w katalogu docelowym każda nazwa jest kopiowana jako oddzielny inode
+int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst/*, const unsigned long long threshold*/)
+{
+    // ściezka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
+    char *srcFilePath = NULL, *dstFilePath = NULL;
+    if((srcFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu źródłowego
+        return -1;
+    if((dstFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu docelowego
+    {
+        free(srcFilePath);
+        return -2;
+    }
+    strcpy(srcFilePath, srcDirPath); // kopiujemy ścieżkę katalogu źródłowego do srcFilePath
+    strcpy(dstFilePath, dstDirPath); // kopiujemy ścieżkę katalogu docelowego do dstFilePath
+    element *curS = filesSrc->first, *curD = filesDst->first;
+    struct stat srcFile, dstFile;
+    int status = 0;
+    openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
+    while(curS != NULL && curD != NULL)
+    {
+        char *srcFileName = curS->entry->d_name, *dstFileName = curD->entry->d_name;
+        int comparison = strcmp(srcFileName, dstFileName);
+        if(comparison > 0) // srcFileName > dstFileName
+        {
+            stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
+            status = removeFile(dstFilePath); // usuwamy plik docelowy
+            syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+            curD = curD->next;
+        }
+        else
+        {
+            stringAppend(srcFilePath, srcDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu źródłowego
+            if(stat(srcFilePath, &srcFile) == -1) // odczytujemy metadane pliku źródłowego
+            {
+                curS = curS->next; // przesuwamy wskaźnik na liście źródłowej
+                if(comparison < 0)
+                    syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno); // status zapisany przez stat do errno (liczba dodatnia)
+                else // if(comparison == 0)
+                {
+                    syslog(LOG_INFO, "odczytujemy metadane pliku źródłowego %s; %i\n", srcFilePath, errno);
+                    curD = curD->next; // przesuwamy wskaźnik na liście docelowej
+                }
+                continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
+            }
+            if(comparison < 0) // srcFileName < dstFileName
+            {
+                stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu docelowego
+                // kopiujemy plik źródłowy do katalogu docelowego; przepisujemy czas modyfikacji z pliku źródłowego do pliku docelowego
+                if(srcFile.st_size < THRESHOLD) // jeżeli plik ma rozmiar w bajtach mniejszy niż poziom dużego pliku
+                    status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim); // kopiujemy uprawnienia i typ (zawsze plik zwykły) pliku źródłowego do pliku docelowego
+                else
+                    status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
+                syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status); // nie przerywamy, jeżeli nie udało się skopiować pliku, ale wypisujemy status operacji
+                curS = curS->next;
+            }
+            else // srcFileName == dstFileName
+            {
+                stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
+                if(stat(dstFilePath, &dstFile) == -1) // odczytujemy metadane pliku docelowego
+                    syslog(LOG_INFO, "odczytujemy metadane pliku docelowego %s; %i\n", dstFilePath, errno);
+                else // jeżeli poprawnie odczytaliśmy metadane
+                if(srcFile.st_mtim.tv_sec != dstFile.st_mtim.tv_sec || srcFile.st_mtim.tv_nsec != dstFile.st_mtim.tv_nsec) // srcFile.st_mtim != dstFile.st_mtim; jeżeli plik docelowy ma inny czas modyfikacji (wcześniejszy - jest nieaktualny lub późniejszy - został edytowany)
+                {
+                    // przepisujemy plik źródłowy do istniejącego pliku docelowego
+                    if(srcFile.st_size < THRESHOLD) // jeżeli plik ma rozmiar w bajtach mniejszy niż poziom dużego pliku
+                        status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim); // kopiujemy uprawnienia i typ (zawsze plik zwykły) pliku źródłowego do pliku docelowego
+                    else
+                        status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
+                    syslog(LOG_INFO, "przepisujemy %s do %s; %i\n", srcFilePath, dstFilePath, status); // nie przerywamy, jeżeli nie udało się przepisać pliku, ale wypisujemy status operacji
+                }
+                else // przy kopiowaniu przepisujemy uprawnienia, ale jeżeli nie przepisywaliśmy pliku, to sprawdzamy, czy pliki nie mają różnych uprawnień
+                // if(srcFile.st_ctim.tv_sec != dstFile.st_ctim.tv_sec || srcFile.st_ctim.tv_nsec != dstFile.st_ctim.tv_nsec) // jeżeli plik docelowy ma inny czas zmiany (czas modyfikacji metadanych m. in. uprawnień, właściciela, atim, mtim, itp.); aby zmienić czas zmiany (ctim), trzeba przestawić czas systemowy, wprowadzić jakąś zmianę w metadanych pliku i z przywrócić czas systemowy; zmiana czasy systemowego może zaburzyć inne procesy, więc tego nie robimy
+                if(srcFile.st_mode != dstFile.st_mode) // jeżeli pliki mają różne uprawnienia
+                {
+                    if(chmod(dstFilePath, srcFile.st_mode) == -1) // przepisujemy uprawnienia z pliku źródłowego do katalogu docelowego
+                        status = errno;
+                    else
+                        status = 0;
+                    syslog(LOG_INFO, "przepisujemy uprawnienia pliku %s do %s; %i\n", srcFilePath, dstFilePath, status);
+                }
+                curS = curS->next; // przesuwamy wskaźniki elementów na listach, bo niżej nie będą już potrzebne
+                curD = curD->next;
+            }
+        }
+    }
+    while(curD != NULL) // jeżeli w powyższej pętli nie wystąpił błąd; usuwamy pozostałe pliki z katalogu docelowego, począwszy od aktualnie wskazywanego przez curD, ponieważ nie istnieją one w katalogu źródłowym
+    {
+        char *dstFileName = curD->entry->d_name;
+        stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
+        status = removeFile(dstFilePath);
+        syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+        curD = curD->next;
+    }
+    while(curS != NULL) // kopiujemy pozostałe pliki z katalogu źródłowego, począwszy od aktualnie wskazywanego przez curS
+    {
+        char *srcFileName = curS->entry->d_name;
+        stringAppend(srcFilePath, srcDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu źródłowego
+        if(stat(srcFilePath, &srcFile) == -1) // odczytujemy metadane pliku źródłowego
+            syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
+        else
+        {
+            stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu docelowego
+            // kopiujemy plik źródłowy do katalogu docelowego; przepisujemy czas modyfikacji z pliku źródłowego do pliku docelowego
+            if(srcFile.st_size < THRESHOLD) // jeżeli plik ma rozmiar w bajtach mniejszy niż poziom dużego pliku
+                status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim); // kopiujemy uprawnienia i typ (zawsze plik zwykły) pliku źródłowego do pliku docelowego
+            else
+                status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
+            syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
+        }
+        curS = curS->next;
+    }
+    free(srcFilePath);
+    free(dstFilePath);
+    closelog();
+    return 0;
+}
+// wszędzie w nazwach zmiennych wyraz "file" jest użyty w znaczeniu "katalog", bo nie chce mi się zmieniać, a katalog to też plik
+int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst, char *isReady)
+{
+    // ściezka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
+    char *srcFilePath = NULL, *dstFilePath = NULL;
+    if((srcFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu źródłowego
+        return -1;
+    if((dstFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu docelowego
+    {
+        free(srcFilePath);
+        return -2;
+    }
+    strcpy(srcFilePath, srcDirPath); // kopiujemy ścieżkę katalogu źródłowego do srcFilePath
+    strcpy(dstFilePath, dstDirPath); // kopiujemy ścieżkę katalogu docelowego do dstFilePath
+    element *curS = filesSrc->first, *curD = filesDst->first;
+    struct stat srcFile, dstFile;
+    unsigned int i = 0;
+    int status = 0;
+    openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
+    while(curS != NULL && curD != NULL)
+    {
+        char *srcFileName = curS->entry->d_name, *dstFileName = curD->entry->d_name;
+        int comparison = strcmp(srcFileName, dstFileName);
+        if(comparison > 0) // srcFileName > dstFileName
+        {
+            stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę katalogu do usunięcia do ścieżki katalogu docelowego
+            size_t length = dstDirPathLength + strlen(dstFileName);
+            stringAppend(dstFilePath, length++, "/"); // dopisujemy '/' do ścieżki usuwanego katalogu
+            status = removeDirectoryRecursively(dstFilePath, length);
+            syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstFilePath, status);
+            curD = curD->next;
+        }
+        else
+        {
+            stringAppend(srcFilePath, srcDirPathLength, srcFileName); // dopisujemy nazwę katalogu źródłowego do ścieżki katalogu (korzenia) źródłowego
+            if(stat(srcFilePath, &srcFile) == -1) // odczytujemy metadane katalogu źródłowego
+            {
+                curS = curS->next; // przesuwamy wskaźnik na liście źródłowej
+                if(comparison < 0)
+                {
+                    syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, errno);
+                    isReady[i++] = 0; // zaznaczamy, że katalog nie jest gotowy do synchronizacji, bo nie istnieje
+                }
+                else // if(comparison == 0)
+                {
+                    syslog(LOG_INFO, "odczytujemy metadane katalogu źródłowego %s; %i\n", srcFilePath, errno);
+                    isReady[i++] = 1; // jeżeli nie udało się sprawdzić, czy katalog docelowy ma takie same uprawnienia, jak źródłowy, to zakładamy, że ma
+                    curD = curD->next; // przesuwamy wskaźnik na liście docelowej
+                }
+                continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
+            }
+            if(comparison < 0) // srcFileName < dstFileName
+            {
+                stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę katalogu do stworzenia do ścieżki katalogu docelowego
+                status = createEmptyDirectory(dstFilePath, srcFile.st_mode); // tworzymy w katalogu docelowym katalog o nazwie takiej, jak w katalogu źródłowym; nie przepisujemy czasu modyfikacji, bo nie zwracamy na niego uwagi przy synchronizacji - wszystkie katalogi i tak będą rekurencyjnie przejrzane w celu wykrycia zmian plików
+                syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, status);
+                if(status < 0) isReady[i++] = 0;
+                else isReady[i++] = 1;
+                curS = curS->next;
+            }
+            else // if(comparison == 0) // srcFileName == dstFileName
+            {
+                isReady[i++] = 1;
+                stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę katalogu docelowego do ścieżki katalogu (korzenia) docelowego
+                if(stat(dstFilePath, &dstFile) == -1) // odczytujemy metadane katalogu docelowego
+                    syslog(LOG_INFO, "odczytujemy metadane katalogu docelowego %s; %i\n", dstFilePath, errno);
+                else // jeżeli poprawnie odczytaliśmy metadane
+                // if(srcFile.st_mtim.tv_sec != dstFile.st_mtim.tv_sec || srcFile.st_mtim.tv_nsec != dstFile.st_mtim.tv_nsec) // ignorujemy czas modyfikacji zawartości (zmienia się on podczas tworzenia i usuwania plików z katalogu)
+                if(srcFile.st_mode != dstFile.st_mode) // jeżeli katalogi mają różne uprawnienia
+                {
+                    if(chmod(dstFilePath, srcFile.st_mode) == -1) // przepisujemy uprawnienia z katalogu źródłowego do katalogu docelowego
+                        status = errno;
+                    else
+                        status = 0;
+                    syslog(LOG_INFO, "przepisujemy uprawnienia katalogu %s do %s; %i\n", srcFilePath, dstFilePath, status);
+                }
+                curS = curS->next;
+                curD = curD->next;
+            }
+        }
+    }
+    while(curD != NULL) // usuwamy pozostałe katalogi z katalogu docelowego, począwszy od aktualnie wskazywanego przez curD, ponieważ nie istnieją one w katalogu źródłowym
+    {
+        char *dstFileName = curD->entry->d_name;
+        stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę katalogu do usunięcia do ścieżki katalogu docelowego
+        size_t length = dstDirPathLength + strlen(dstFileName);
+        stringAppend(dstFilePath, length++, "/"); // dopisujemy '/' do ścieżki usuwanego katalogu
+        status = removeDirectoryRecursively(dstFilePath, length);
+        syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstFilePath, status);
+        curD = curD->next;
+    }
+    while(curS != NULL) // kopiujemy pozostałe katalogi z katalogu źródłowego, począwszy od aktualnie wskazywanego przez curS
+    {
+        char *srcFileName = curS->entry->d_name;
+        stringAppend(srcFilePath, srcDirPathLength, srcFileName); // dopisujemy nazwę katalogu źródłowego do ścieżki katalogu (korzenia) źródłowego
+        if(stat(srcFilePath, &srcFile) == -1) // odczytujemy metadane katalogu źródłowego
+        {
+            curS = curS->next; // przesuwamy wskaźnik na liście źródłowej
+            syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, errno);
+            isReady[i++] = 0; // zaznaczamy, że katalog nie jest gotowy do synchronizacji, bo nie istnieje
+            continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
+        }
+        stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę katalogu do stworzenia do ścieżki katalogu docelowego
+        status = createEmptyDirectory(dstFilePath, srcFile.st_mode);
+        syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, status);
+        if(status < 0) isReady[i++] = 0;
+        else isReady[i++] = 1;
+        curS = curS->next;
+    }
+    free(srcFilePath);
+    free(dstFilePath);
+    closelog();
     return 0;
 }
 
