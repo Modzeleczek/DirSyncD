@@ -115,6 +115,21 @@ void listMergeSort(list *l);
 
 /*
 odczytuje:
+srcFilePath - ścieżka do pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstFilePath - ścieżka do pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstMode - uprawnienia ustawiane plikowi docelowemu
+dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
+dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
+
+/*
+odczytuje:
 path - ścieżka do pliku bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
 
 zwraca:

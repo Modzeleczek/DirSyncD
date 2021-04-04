@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <linux/fs.h>
 #include <signal.h>
+#include <errno.h>
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
 #define BUFFERSIZE 4096
@@ -127,6 +128,85 @@ void listMergeSort(list *l) {
         // Otherwise repeat, merging lists twice the size
         insize *= 2;
     }
+}
+
+int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
+{
+    int ret = 0, in = -1, out = -1;
+    if((in = open(srcFilePath, O_RDONLY)) == -1) // deskryptor pliku wejściowego; O_RDONLY - tylko odczyt
+        ret = -1;
+    else // jeżeli in != -1, czyli plik źródłowy został poprawnie otwarty, to open(dstFilePath, ...) się wykona;
+    if((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1) // deskryptor pliku wyjściowego; O_WRONLY - tylko zapis; O_CREAT - utworzenie pliku, jeżeli jeszcze nie istnieje; O_TRUNC - jeżeli plik istnieje, to usunięcie jego zawartości; jeżeli plik jeszcze nie istnieje, to na początku nie dostanie żadnych uprawnień
+        ret = -2;
+    else // jeżeli in != -1 i out != -1, czyli plik źródłowy i docelowy zostały prawidłowo otwarte
+    if(fchmod(out, dstMode) == -1) // ustawiamy plikowi docelowemu uprawnienia dstMode
+        ret = -3;
+    else
+    {
+        if(posix_fadvise(in, 0, 0, POSIX_FADV_SEQUENTIAL) == -1) // str. 124; wysyłamy jądru wskazówkę (poradę), że plik wejściowy będzie odczytywany sekwencyjnie i dlatego należy go wczytywać z wyprzedzeniem
+            ret = 1; // błąd niekrytyczny
+        char *buffer = NULL;
+        if((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL) // optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w metadanych pobranych statem
+            ret = -4;
+        else
+        {
+            while(1) 
+            {
+                // brak obsługi błędów
+                // int readBytes = read(in, buffer, BUFFERSIZE);
+                // write(out, buffer, readBytes);
+                // if(readBytes < BUFFERSIZE)
+                //     break;
+                char *position = buffer; // str. 45; pozycja w buforze wyjściowym
+                size_t remainingBytes = BUFFERSIZE;
+                ssize_t bytesRead;
+                while(remainingBytes != 0 && (bytesRead = read(in, position, remainingBytes)) != 0)
+                {
+                    if(bytesRead == -1)
+                    {
+                        if(errno == EINTR)
+                            continue;
+                        ret = -5;
+                        remainingBytes = BUFFERSIZE; // BUFFERSIZE - BUFFERSIZE == 0, więc druga pętla się nie wykona
+                        bytesRead = 0; // ustawiamy na 0, aby if(bytesRead == 0) zakończył zewnętrzną pętlę
+                        break;
+                    }
+                    remainingBytes -= bytesRead;
+                    position += bytesRead;
+                }
+                position = buffer; // str. 48
+                remainingBytes = BUFFERSIZE - remainingBytes; // zapisujemy całkowitą liczbę odczytanych bajtów, która zawsze jest mniejsza lub równa rozmiarowi bufora
+                ssize_t bytesWritten;
+                while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                {
+                    if(bytesWritten == -1)
+                    {
+                        if(errno == EINTR)
+                            continue;
+                        ret = -6;
+                        bytesRead = 0; // ustawiamy na 0, aby if(bytesRead == 0) zakończył zewnętrzną pętlę
+                        break;
+                    }
+                    remainingBytes -= bytesWritten;
+                    position += bytesWritten;
+                }
+                if(bytesRead == 0) // doszliśmy do końca pliku (EOF) lub wystąpił błąd
+                    break;
+            }
+            free(buffer);
+            if(ret >= 0) // jeżeli nie wystąpiły błędy podczas kopiowania
+            {
+                const struct timespec times[2] = { *dstAccessTime, *dstModificationTime };
+                if(futimens(out, times) == -1) // ustawiamy plikowi wyjściowemu czasy ostatniego dostępu i modyfikacji; czas modyfikacji musi być ustawiony po skończeniu zapisów do pliku wyjściowego, bo zmieniają one go na aktualny czas systemowy
+                    ret = -7;
+            }
+        }
+    }
+    if(in != -1 && close(in) == -1)
+        ret = -8;
+    if(out != -1 && close(out) == -1)
+        ret = -9;
+    return ret;
 }
 
 int removeFile(const char *path)
