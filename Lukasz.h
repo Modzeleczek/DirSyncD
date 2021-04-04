@@ -176,6 +176,11 @@ zwraca:
 0, jeżeli nie wystąpił błąd
 */
 int removeDirectoryRecursively(const char *path, const size_t pathLength);
+/*
+odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; nie musi być zakończona '/'
+*/
+int startDirectoryRemoval(const char *path);
 
 /*
 odczytuje:

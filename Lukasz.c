@@ -353,6 +353,18 @@ int removeDirectoryRecursively(const char *path, const size_t pathLength)
         ret = -5; // zaznaczamy błąd krytyczny wyższemu wywołaniu
     return ret;
 }
+// do usuwania katalogów bez kontekstu, czyli kiedy jako path podamy np. argument programu, którego nie możemy zmieniać
+int startDirectoryRemoval(const char *path)
+{
+    char *rootPath = malloc(sizeof(char) * PATH_MAX); // rezerwujemy PATH_MAX bajtów na ścieżki katalogów
+    strcpy(rootPath, path); // kopiujemy path do rootPath
+    size_t rootPathLength = strlen(rootPath);
+    if(rootPath[rootPathLength - 1] != '/') // jeżeli bezpośrednio przed null terminatorem nie ma '/'
+        stringAppend(rootPath, rootPathLength++, "/"); // wstawiamy '/' na miejscu null terminatora; zwiększamy długość ścieżki o 1; wstawiamy null terminator za '/'
+    int ret = removeDirectoryRecursively(rootPath, rootPathLength);
+    free(rootPath);
+    return ret;
+}
 
 // zakładamy, że podano prawidłowy wskaźnik do listy i do katalogu
 int listFiles(DIR *dir, list *files)
