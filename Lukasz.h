@@ -65,5 +65,10 @@ l - lista jednokierunkowa
 newEntry - element katalogu, który dodajemy na koniec listy
 */
 void pushBack(list *l, struct dirent *newEntry);
+/*
+odczytuje:
+l - lista jednokierunkowa
+*/
+void clear(list *l);
 
 #endif

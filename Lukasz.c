@@ -50,6 +50,17 @@ void pushBack(list *l, struct dirent *newEntry)
     }
     ++l->count;
 }
+void clear(list *l)
+{
+    element *cur = l->first, *next;
+    while(cur != NULL)
+    {
+        next = cur->next;
+        free(cur);
+        cur = next;
+    }
+    initialize(l);
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
