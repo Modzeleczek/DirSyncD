@@ -97,25 +97,34 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         printf("PID procesu potomnego: %i\n", pid); // wypisujemy PID procesu potomnego - przyszłego demona
         exit(0); // zamykamy proces rodzicielski ze statusem 0 (brak błędów)
     }
-    
     // poniższy kod wykonuje się w procesie potomnym, bo w nim pid == 0; przekształcamy proces potomny w demona
+    int ret = 0;
     if(setsid() == -1) // tworzymy nową sesję i grupę procesów
-        exit(-1); // zamykamy proces potomny ze statusem -1 (błąd); nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
-    if(chdir("/") == -1) // ustawiamy katalog roboczy na /
-        exit(-2); // zamykamy proces potomny ze statusem -2 (błąd)
-    int i;
-    for(i = 0; i < 1023; ++i) // zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2) i dalsze deskryptory - łącznie od 0 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
-        close(i);
-    // przeadresowujemy deskryptory 0, 1, 2 na /dev/null
-    open("/dev/null", O_RDWR); // deskryptor 0 (stdin) wskazuje teraz na /dev/null
-    dup(0); // deskryptor 1 (stdout) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
-    dup(0); // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
-
-    // w tym momencie proces potomny jest już demonem
-    if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
+        ret = -1; // nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
+    else if(chdir("/") == -1) // ustawiamy katalog roboczy procesu na /
+        ret = -2;
+    else
     {
-        // fprintf(stderr, "nie mozna obsluzyc sygnalu SIGINT1\n"); // demon ma deskryptor 2 przeadresowany na /dev/null, więc nie możemy pisać do stderr
-        exit(-3); // zamykamy proces demona ze statusem -3 (błąd)
+        int i;
+        for(i = 0; i < 1023; ++i) // zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2) i dalsze deskryptory - łącznie od 0 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
+            if(close(i) == -1) // jeżeli nie uda się zamknąć któregoś deskryptora
+            {
+                ret = -3;
+                break;
+            }
     }
-    exit(0); // zamykamy proces demona ze statusem 0 (brak błędów)
+    if(ret >= 0)
+    {
+        // przeadresowujemy deskryptory 0, 1, 2 na /dev/null
+        if(open("/dev/null", O_RDWR) == -1) // deskryptor 0 (stdin) wskazuje teraz na /dev/null
+            ret = -4;
+        else if(dup(0) == -1) // deskryptor 1 (stdout) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+            ret = -5;
+        else if(dup(0) == -1) // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+            ret = -6;
+        // jeżeli nie wystąpił błąd, to w tym momencie proces potomny jest już demonem
+        else if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
+            ret = -7;
+    }
+    exit(ret); // zamykamy proces demona
 }
