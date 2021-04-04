@@ -177,5 +177,18 @@ zwraca:
 0, jeżeli nie wystąpił błąd
 */
 int listFiles(DIR *dir, list *files);
+/*
+odczytuje:
+dir - strumień katalogu otwarty za pomocą opendir
+
+zapisuje:
+files - lista zwykłych plików znajdujących się w katalogu
+dirs - lista katalogów znajdujących się w katalogu
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int listFilesAndDirectories(DIR *dir, list *files, list *dirs);
 
 #endif

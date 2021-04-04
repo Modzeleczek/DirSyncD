@@ -319,6 +319,25 @@ int listFiles(DIR *dir, list *files)
         return -1;
     return 0;
 }
+int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
+{
+    struct dirent *entry;
+    errno = 0;
+    while((entry = readdir(dir)) != NULL)
+    {
+        if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
+            pushBack(files, entry);
+        else if(entry->d_type == DT_DIR) // jeżeli element jest katalogiem (directory)
+        {
+            if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) // jeżeli katalog ma nazwę różną od "." i różną od ".."
+                pushBack(dirs, entry); // dodajemy go do listy katalogów
+        }
+        // elementy o innych typach (symlinki; urządzenia blokowe, tekstowe; sockety; itp.) ignorujemy
+    }
+    if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
+        return -1;
+    return 0;
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
