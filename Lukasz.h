@@ -3,6 +3,7 @@
 #define LUKASZ_H
 
 #include <dirent.h>
+#include <sys/stat.h>
 
 /*
 odczytuje:
@@ -121,5 +122,16 @@ zwraca:
 0, jeżeli nie wystąpił błąd
 */
 int removeFile(const char *path);
+
+/*
+odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+mode - uprawnienia utworzonego katalogu
+
+zwraca:
+-1, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int createEmptyDirectory(const char *path, mode_t mode);
 
 #endif
