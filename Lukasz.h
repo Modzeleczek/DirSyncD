@@ -44,6 +44,16 @@ threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 */
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive);
 
+/*
+odczytuje:
+offset - numer bajtu w ciągu dst, od którego zaczynamy wstawiać ciąg src
+src - ciąg wstawiany do ciągu dst
+
+zapisuje:
+dst - ciąg, do którego wstawiamy ciąg src
+*/
+void stringAppend(char *dst, const size_t offset, const char *src);
+
 typedef struct element element;
 /*
 Węzeł listy jednokierunkowej przechowujący wskaźnik do elementu katalogu.

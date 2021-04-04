@@ -19,6 +19,12 @@
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
 #define BUFFERSIZE 4096
 
+void stringAppend(char *dst, const size_t offset, const char *src)
+{
+    strcpy(dst + offset, src); // przesuwamy się o offset bajtów względem początku stringa dst; od obliczonej pozycji wklejamy stringa src
+    // możnaby użyć strcat, ale on dokleja src na końcu dst i prawdopodobnie oblicza długość dst strlenem, marnując czas
+}
+
 struct element
 {
     element *next;
