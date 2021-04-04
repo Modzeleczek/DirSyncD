@@ -165,4 +165,17 @@ zwraca:
 */
 int createEmptyDirectory(const char *path, mode_t mode);
 
+/*
+odczytuje:
+dir - strumień katalogu otwarty za pomocą opendir
+
+zapisuje:
+files - lista zwykłych plików znajdujących się w katalogu
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int listFiles(DIR *dir, list *files);
+
 #endif

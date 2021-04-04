@@ -305,6 +305,21 @@ int createEmptyDirectory(const char *path, mode_t mode)
     return mkdir(path, mode);
 }
 
+// zakładamy, że podano prawidłowy wskaźnik do listy i do katalogu
+int listFiles(DIR *dir, list *files)
+{
+    struct dirent *entry;
+    errno = 0;
+    while((entry = readdir(dir)) != NULL)
+    {
+        if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
+            pushBack(files, entry);
+    }
+    if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
+        return -1;
+    return 0;
+}
+
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu
