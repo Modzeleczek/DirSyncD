@@ -321,27 +321,32 @@ int removeDirectoryRecursively(const char *path, const size_t pathLength)
             ret = -2;
         else
         {
-            char *subPath = malloc(sizeof(char) * PATH_MAX); // rezerwujemy PATH_MAX bajtów na ścieżki podkatalogów i plików
-            strcpy(subPath, path); // kopiujemy path do nextPath
-            element *cur = dirs.first;
-            while(cur != NULL)
+            char *subPath = NULL;
+            if((subPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki podkatalogów i plików; jeżeli nie udało się zarezerwować pamięci
+                ret = -3;
+            else
             {
-                stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę podkatalogu do aktualnej ścieżki katalogu
-                size_t subPathLength = pathLength + strlen(cur->entry->d_name);
-                stringAppend(subPath, subPathLength++, "/"); // dopisujemy '/' do utworzonej ścieżki
-                if(removeDirectoryRecursively(subPath, subPathLength) < 0) // rekurencyjnie wywołujemy usuwanie podkatalogów; jeżeli nie udało się usunąć któregoś podkatalogu
-                    ret = -3; // zaznaczamy błąd wyższemu wywołaniu
-                cur = cur->next;
+                strcpy(subPath, path); // kopiujemy path do nextPath
+                element *cur = dirs.first;
+                while(cur != NULL)
+                {
+                    stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę podkatalogu do aktualnej ścieżki katalogu
+                    size_t subPathLength = pathLength + strlen(cur->entry->d_name);
+                    stringAppend(subPath, subPathLength++, "/"); // dopisujemy '/' do utworzonej ścieżki
+                    if(removeDirectoryRecursively(subPath, subPathLength) < 0) // rekurencyjnie wywołujemy usuwanie podkatalogów; jeżeli nie udało się usunąć któregoś podkatalogu
+                        ret = -4; // zaznaczamy błąd wyższemu wywołaniu
+                    cur = cur->next;
+                }
+                cur = files.first;
+                while(cur != NULL) // usuwamy pliki z aktualnego katalogu
+                {
+                    stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę pliku do aktualnej ścieżki katalogu
+                    if(removeFile(subPath) == -1) // usuwamy plik
+                        ret = -5;
+                    cur = cur->next;
+                }
+                free(subPath);
             }
-            cur = files.first;
-            while(cur != NULL) // usuwamy pliki z aktualnego katalogu
-            {
-                stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę pliku do aktualnej ścieżki katalogu
-                if(removeFile(subPath) == -1) // usuwamy plik
-                    ret = -4;
-                cur = cur->next;
-            }
-            free(subPath);
         }
         clear(&dirs); // czyścimy listę podkatalogów
         clear(&files); // czyścimy listę plików
@@ -350,7 +355,7 @@ int removeDirectoryRecursively(const char *path, const size_t pathLength)
         ret = 1; // jeżeli nie uda się zamknąć, to zaznaczamy liczbą dodatnią błąd niekrytyczny wyższemu wywołaniu
     // błąd krytyczny w funkcji występuje, jeżeli nie uda się usunąć któregokolwiek elementu z podkatalogów aktualnego katalogu
     if(ret >= 0 && rmdir(path) == -1) // jeżeli nie wystąpił żaden błąd krytyczny, usuwamy aktualny katalog; jeżeli nie uda się usunąć aktualnego katalogu
-        ret = -5; // zaznaczamy błąd krytyczny wyższemu wywołaniu
+        ret = -6; // zaznaczamy błąd krytyczny wyższemu wywołaniu
     return ret;
 }
 // do usuwania katalogów bez kontekstu, czyli kiedy jako path podamy np. argument programu, którego nie możemy zmieniać
