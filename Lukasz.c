@@ -22,6 +22,12 @@ struct element
     struct dirent *entry; // element katalogu
 };
 
+struct list
+{
+    element *first, *last;
+    unsigned int count;
+};
+
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu

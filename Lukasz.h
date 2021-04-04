@@ -47,4 +47,10 @@ Węzeł listy jednokierunkowej przechowujący wskaźnik do elementu katalogu.
 */
 struct element;
 
+typedef struct list list;
+/*
+Lista jednokierunkowa.
+*/
+struct list;
+
 #endif
