@@ -48,6 +48,17 @@ typedef struct element element;
 Węzeł listy jednokierunkowej przechowujący wskaźnik do elementu katalogu.
 */
 struct element;
+/*
+odczytuje:
+a - pierwszy element
+b - drugi element
+
+zwraca:
+< 0, jeżeli a jest przed b w porządku leksykograficznym według nazwy elementu katalogu
+0, jeżeli a i b mają równe nazwy elementu katalogu
+> 0, jeżeli a jest po b w porządku leksykograficznym według nazwy elementu katalogu
+*/
+int cmp(element *a, element *b);
 
 typedef struct list list;
 /*

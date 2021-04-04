@@ -21,6 +21,10 @@ struct element
     element *next;
     struct dirent *entry; // element katalogu
 };
+int cmp(element *a, element *b)
+{
+    return strcmp(a->entry->d_name, b->entry->d_name); // funkcja porównująca elementy; porządek leksykograficzny
+}
 
 struct list
 {
