@@ -41,4 +41,10 @@ threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 */
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive);
 
+typedef struct element element;
+/*
+Węzeł listy jednokierunkowej przechowujący wskaźnik do elementu katalogu.
+*/
+struct element;
+
 #endif
