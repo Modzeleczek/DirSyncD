@@ -64,11 +64,6 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
     return 0;
 }
 
-void printUsage()
-{
-    printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
-}
-
 int directoryValid(const char *path)
 {
     DIR *d = opendir(path); // otwieramy katalog

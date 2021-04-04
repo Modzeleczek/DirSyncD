@@ -21,11 +21,6 @@ zwraca:
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive);
 
 /*
-wypisuje sposób użycia programu na stdout
-*/
-void printUsage();
-
-/*
 odczytuje:
 path - ścieżka do katalogu
 
