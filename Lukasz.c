@@ -14,6 +14,7 @@
 #include <linux/fs.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
 #define BUFFERSIZE 4096
@@ -206,6 +207,91 @@ int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t
         ret = -8;
     if(out != -1 && close(out) == -1)
         ret = -9;
+    return ret;
+}
+
+int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
+{
+    int ret = 0, in = -1, out = -1;
+    if((in = open(srcFilePath, O_RDONLY)) == -1) // deskryptor pliku wejściowego; O_RDONLY - tylko odczyt
+        ret = -1;
+    else // jeżeli in != -1, czyli plik źródłowy został poprawnie otwarty, to open(dstFilePath, ...) się wykona;
+    if((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1) // deskryptor pliku wyjściowego; O_WRONLY - tylko zapis; O_CREAT - utworzenie pliku, jeżeli jeszcze nie istnieje; O_TRUNC - jeżeli plik istnieje, to usunięcie jego zawartości; jeżeli plik jeszcze nie istnieje, to na początku nie dostanie żadnych uprawnień
+        ret = -2;
+    else // jeżeli in != -1 i out != -1, czyli plik źródłowy i docelowy zostały prawidłowo otwarte
+    if(fchmod(out, dstMode) == -1) // ustawiamy plikowi docelowemu uprawnienia dstMode
+        ret = -3;
+    else
+    {
+        char *map;
+        if((map = mmap(0, fileSize, PROT_READ, MAP_SHARED, in, 0)) == MAP_FAILED) // odwzorowujemy (mapujemy) w pamięci plik wejściowy w trybie do odczytu; jeżeli nie udało się zmapować pliku
+            ret = -4;
+        else
+        {
+            if(madvise(map, fileSize, MADV_SEQUENTIAL) == -1) // str. 121; wysyłamy jądru wskazówkę (poradę), że plik wejściowy będzie odczytywany sekwencyjnie
+                ret = 1; // błąd niekrytyczny
+            char *buffer = NULL;
+            if((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL) // optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w metadanych pobranych statem; jeżeli nie udało się zarezerwować pamięci na bufor
+                ret = -5;
+            else
+            {
+                unsigned long long b; // numer bajtu w pliku wejściowym
+                char *position; // pozycja w buforze wyjściowym
+                size_t remainingBytes;
+                ssize_t bytesWritten;
+                for(b = 0; b + BUFFERSIZE < fileSize; b += BUFFERSIZE) // nie może być (b < fileSize - BUFFERSIZE), bo b i fileSize są unsigned, więc jeżeli fileSize < BUFFERSIZE i odejmiemy, to mamy przepełnienie
+                {
+                    memcpy(buffer, map + b, BUFFERSIZE); // kopiujemy BUFFERSIZE (rozmiar bufora) bajtów ze zmapowanej pamięci do bufora zapisu
+                    position = buffer; // str. 48
+                    remainingBytes = BUFFERSIZE; // zapisujemy całkowitą liczbę odczytanych bajtów, która zawsze jest równa rozmiarowi bufora
+                    while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                    {
+                        if(bytesWritten == -1)
+                        {
+                            if(errno == EINTR)
+                                continue;
+                            ret = -6;
+                            b = ULLONG_MAX - BUFFERSIZE; // dla pewności można ustawić b = ULLONG_MAX - BUFFERSIZE; w praktyce fileSize zawsze jest mniejsze od ULLONG_MAX (nie ma plików o rozmiarze 2^64 B), więc można ustawić b = fileSize, aby zakończyć fora i spowodować, że przed poniższą pętlą remainingBytes == 0 - wtedy memcpy nie skopiuje bajtów, a pętla się nie wykona
+                            break;
+                        }
+                        remainingBytes -= bytesWritten;
+                        position += bytesWritten;
+                    }
+                }
+                if(ret >= 0) // jeżeli nie wystąpił błąd podczas dotychczasowego kopiowania
+                {
+                    remainingBytes = fileSize - b; // liczba bajtów z końca pliku, które nie zmieściły się w buforze
+                    memcpy(buffer, map + b, remainingBytes);
+                    position = buffer;
+                    while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                    {
+                        if(bytesWritten == -1)
+                        {
+                            if(errno == EINTR)
+                                continue;
+                            ret = -7;
+                            break;
+                        }
+                        remainingBytes -= bytesWritten;
+                        position += bytesWritten;
+                    }
+                }
+                free(buffer);
+                if(ret >= 0) // jeżeli nie wystąpiły błędy podczas kopiowania
+                {
+                    const struct timespec times[2] = { *dstAccessTime, *dstModificationTime };
+                    if(futimens(out, times) == -1) // ustawiamy plikowi wyjściowemu czasy ostatniego dostępu i modyfikacji
+                        ret = -8;
+                }
+            }
+            if(munmap(map, fileSize) == -1)
+                ret = -9;
+        }
+    }
+    if(in != -1 && close(in) == -1)
+        ret = -10;
+    if(out != -1 && close(out) == -1)
+        ret = -11;
     return ret;
 }
 

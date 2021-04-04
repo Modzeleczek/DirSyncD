@@ -130,6 +130,22 @@ int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t
 
 /*
 odczytuje:
+srcFilePath - ścieżka do pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstFilePath - ścieżka do pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+fileSize - rozmiar w bajtach pliku źródłowego i docelowego po prawidłowym skopiowaniu
+dstMode - uprawnienia ustawiane plikowi docelowemu
+dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
+dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
+
+/*
+odczytuje:
 path - ścieżka do pliku bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
 
 zwraca:
