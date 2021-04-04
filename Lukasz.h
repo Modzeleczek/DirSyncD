@@ -167,6 +167,18 @@ int createEmptyDirectory(const char *path, mode_t mode);
 
 /*
 odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+pathLength - długość ścieżki w bajtach
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int removeDirectoryRecursively(const char *path, const size_t pathLength);
+
+/*
+odczytuje:
 dir - strumień katalogu otwarty za pomocą opendir
 
 zapisuje:

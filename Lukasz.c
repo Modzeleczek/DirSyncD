@@ -305,6 +305,55 @@ int createEmptyDirectory(const char *path, mode_t mode)
     return mkdir(path, mode);
 }
 
+// ścieżka musi być zakończona '/'
+int removeDirectoryRecursively(const char *path, const size_t pathLength)
+{
+    int ret = 0;
+    DIR *dir = NULL;
+    if((dir = opendir(path)) == NULL)
+        ret = -1;
+    else
+    {
+        list dirs, files;
+        initialize(&dirs);
+        initialize(&files);
+        if(listFilesAndDirectories(dir, &files, &dirs) < 0)
+            ret = -2;
+        else
+        {
+            char *subPath = malloc(sizeof(char) * PATH_MAX); // rezerwujemy PATH_MAX bajtów na ścieżki podkatalogów i plików
+            strcpy(subPath, path); // kopiujemy path do nextPath
+            element *cur = dirs.first;
+            while(cur != NULL)
+            {
+                stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę podkatalogu do aktualnej ścieżki katalogu
+                size_t subPathLength = pathLength + strlen(cur->entry->d_name);
+                stringAppend(subPath, subPathLength++, "/"); // dopisujemy '/' do utworzonej ścieżki
+                if(removeDirectoryRecursively(subPath, subPathLength) < 0) // rekurencyjnie wywołujemy usuwanie podkatalogów; jeżeli nie udało się usunąć któregoś podkatalogu
+                    ret = -3; // zaznaczamy błąd wyższemu wywołaniu
+                cur = cur->next;
+            }
+            cur = files.first;
+            while(cur != NULL) // usuwamy pliki z aktualnego katalogu
+            {
+                stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę pliku do aktualnej ścieżki katalogu
+                if(removeFile(subPath) == -1) // usuwamy plik
+                    ret = -4;
+                cur = cur->next;
+            }
+            free(subPath);
+        }
+        clear(&dirs); // czyścimy listę podkatalogów
+        clear(&files); // czyścimy listę plików
+    }
+    if(dir != NULL && closedir(dir) == -1) // zamykamy aktualny katalog
+        ret = 1; // jeżeli nie uda się zamknąć, to zaznaczamy liczbą dodatnią błąd niekrytyczny wyższemu wywołaniu
+    // błąd krytyczny w funkcji występuje, jeżeli nie uda się usunąć któregokolwiek elementu z podkatalogów aktualnego katalogu
+    if(ret >= 0 && rmdir(path) == -1) // jeżeli nie wystąpił żaden błąd krytyczny, usuwamy aktualny katalog; jeżeli nie uda się usunąć aktualnego katalogu
+        ret = -5; // zaznaczamy błąd krytyczny wyższemu wywołaniu
+    return ret;
+}
+
 // zakładamy, że podano prawidłowy wskaźnik do listy i do katalogu
 int listFiles(DIR *dir, list *files)
 {
