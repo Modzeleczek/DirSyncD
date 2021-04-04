@@ -16,6 +16,118 @@
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
 
+struct element
+{
+    element *next;
+    struct dirent *entry; // element katalogu
+};
+int cmp(element *a, element *b)
+{
+    return strcmp(a->entry->d_name, b->entry->d_name); // funkcja porównująca elementy; porządek leksykograficzny
+}
+
+struct list
+{
+    element *first, *last;
+    unsigned int count;
+};
+// w metodach struktury list zakładamy, że podano prawidłowy wskaźnik do listy
+void initialize(list *l)
+{
+    l->first = l->last = NULL;
+    l->count = 0;
+}
+void pushBack(list *l, struct dirent *newEntry)
+{
+    element *new = malloc(sizeof(element));
+    new->entry = newEntry;
+    new->next = NULL;
+    if(l->first == NULL) // jeżeli lista jest pusta, to first i last są NULLami
+    {
+        l->first = new;
+        l->last = new;
+    }
+    else // jeżeli lista nie jest pusta, to ani first ani last nie są NULLami
+    {
+        l->last->next = new; // ustawiamy aktualnemu lastowi nowy jako następny
+        l->last = new; // przestawiamy aktualny last na nowy
+    }
+    ++l->count;
+}
+void clear(list *l)
+{
+    element *cur = l->first, *next;
+    while(cur != NULL)
+    {
+        next = cur->next;
+        free(cur);
+        cur = next;
+    }
+    initialize(l);
+}
+void listMergeSort(list *l) {
+    element *p, *q, *e, *tail, *list = l->first;
+    int insize, nmerges, psize, qsize, i;
+    if (list == NULL) // Silly special case: if `list' was passed in as NULL, return immediately.
+        return;
+    insize = 1;
+    while (1) {
+        p = list;
+        list = NULL;
+        tail = NULL;
+        nmerges = 0; // count number of merges we do in this pass
+        while (p) {
+            nmerges++; // there exists a merge to be done
+            // step `insize' places along from p
+            q = p;
+            psize = 0;
+            for (i = 0; i < insize; i++) {
+                psize++;
+                    q = q->next;
+                if (!q) break;
+            }
+            // if q hasn't fallen off end, we have two lists to merge
+            qsize = insize;
+            // now we have two lists; merge them
+            while (psize > 0 || (qsize > 0 && q)) {
+                // decide whether next element of merge comes from p or q
+                if (psize == 0) {
+                    // p is empty; e must come from q.
+                    e = q; q = q->next; qsize--;
+                } else if (qsize == 0 || !q) {
+                    // q is empty; e must come from p.
+                    e = p; p = p->next; psize--;
+                } else if (cmp(p,q) <= 0) {
+                    // First element of p is lower (or same); e must come from p.
+                    e = p; p = p->next; psize--;
+                } else {
+                    // First element of q is lower; e must come from q.
+                    e = q; q = q->next; qsize--;
+                }
+                // add the next element to the merged list
+                if (tail) {
+                    tail->next = e;
+                } else {
+                    list = e;
+                }
+                tail = e;
+            }
+            // now p has stepped `insize' places along, and q has too
+            p = q;
+        }
+        tail->next = NULL;
+        // If we have done only one merge, we're finished.
+        if (nmerges <= 1) // allow for nmerges==0, the empty list case
+        {
+            l->last = tail;
+            l->first = list;
+            return;
+        }
+        // Otherwise repeat, merging lists twice the size
+        insize *= 2;
+    }
+}
+
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu

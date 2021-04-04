@@ -2,6 +2,8 @@
 #ifndef LUKASZ_H
 #define LUKASZ_H
 
+#include <dirent.h>
+
 /*
 odczytuje:
 argc - liczba parametrów programu (opcji i argumentów razem)
@@ -40,5 +42,74 @@ recursive - rekurecyjna synchronizacja katalogów
 threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 */
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive);
+
+typedef struct element element;
+/*
+Węzeł listy jednokierunkowej przechowujący wskaźnik do elementu katalogu.
+*/
+struct element;
+/*
+odczytuje:
+a - pierwszy element
+b - drugi element
+
+zwraca:
+< 0, jeżeli a jest przed b w porządku leksykograficznym według nazwy elementu katalogu
+0, jeżeli a i b mają równe nazwy elementu katalogu
+> 0, jeżeli a jest po b w porządku leksykograficznym według nazwy elementu katalogu
+*/
+int cmp(element *a, element *b);
+
+typedef struct list list;
+/*
+Lista jednokierunkowa.
+*/
+struct list;
+/*
+zapisuje:
+l - pusta lista jednokierunkowa przeznaczona do pierwszego użycia
+*/
+void initialize(list *l);
+/*
+odczytuje:
+newEntry - element katalogu, który dodajemy na koniec listy
+zapisuje:
+l - lista jednokierunkowa ze wstawionym na końcu węzłem zawierającym element katalogu newEntry
+*/
+void pushBack(list *l, struct dirent *newEntry);
+/*
+zapisuje:
+l - pusta lista jednokierunkowa przeznaczona do ponownego użycia
+*/
+void clear(list *l);
+/* https://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
+ * This file is copyright 2001 Simon Tatham.
+ * 
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ * 
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT.  IN NO EVENT SHALL SIMON TATHAM BE LIABLE FOR
+ * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+/*
+zapisuje:
+l - lista jednokierunkowa posortowana z wykorzystaniem funkcji cmp porównującej węzły
+*/
+void listMergeSort(list *l);
 
 #endif
