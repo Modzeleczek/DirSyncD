@@ -52,5 +52,10 @@ typedef struct list list;
 Lista jednokierunkowa.
 */
 struct list;
+/*
+odczytuje:
+l - lista jednokierunkowa
+*/
+void initialize(list *l);
 
 #endif

@@ -27,6 +27,12 @@ struct list
     element *first, *last;
     unsigned int count;
 };
+// w metodach struktury list zakładamy, że podano prawidłowy wskaźnik do listy
+void initialize(list *l)
+{
+    l->first = l->last = NULL;
+    l->count = 0;
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
