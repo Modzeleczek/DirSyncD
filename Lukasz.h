@@ -66,19 +66,20 @@ Lista jednokierunkowa.
 */
 struct list;
 /*
-odczytuje:
-l - lista jednokierunkowa
+zapisuje:
+l - pusta lista jednokierunkowa przeznaczona do pierwszego użycia
 */
 void initialize(list *l);
 /*
 odczytuje:
-l - lista jednokierunkowa
 newEntry - element katalogu, który dodajemy na koniec listy
+zapisuje:
+l - lista jednokierunkowa ze wstawionym na końcu węzłem zawierającym element katalogu newEntry
 */
 void pushBack(list *l, struct dirent *newEntry);
 /*
-odczytuje:
-l - lista jednokierunkowa
+zapisuje:
+l - pusta lista jednokierunkowa przeznaczona do ponownego użycia
 */
 void clear(list *l);
 
