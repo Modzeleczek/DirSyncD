@@ -643,6 +643,40 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
     return 0;
 }
 
+int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
+{
+    int ret = 0;
+    DIR *dirS = NULL, *dirD = NULL;
+    if((dirS = opendir(sourcePath)) == NULL)
+        ret = -1;
+    else if((dirD = opendir(destinationPath)) == NULL)
+        ret = -2;
+    else
+    {
+        list filesS, filesD;
+        initialize(&filesS);
+        initialize(&filesD);
+        if(listFiles(dirS, &filesS) < 0)
+            ret = -3;
+        else if(listFiles(dirD, &filesD) < 0)
+            ret = -4;
+        else
+        {
+            listMergeSort(&filesS);
+            listMergeSort(&filesD);
+            updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD); // ignorujemy błędy synchronizacji, bo i tak statusy operacji na plikach są zapisywane w logu
+        }
+        clear(&filesS);
+        clear(&filesD);
+    }
+    // zamknąć katalog można dopiero, gdy skończymy używać obiektów typu dirent, które odczytaliśmy readdirem na tym katalogu, bo są one usuwane z pamięci w momencie zamknięcia katalogu closedirem
+    if(dirS != NULL && closedir(dirS) == -1) // jeżeli dirS == NULL, to closedir(dirS) się nie wykona
+        ret = -5;
+    if(dirD != NULL && closedir(dirD) == -1)
+        ret = -6;
+    return ret;
+}
+
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu
