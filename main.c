@@ -21,8 +21,7 @@ int main(int argc, char **argv)
     char *source, *destination;
     unsigned int interval;
     char recursive;
-    unsigned long long threshold;
-    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive, &threshold) < 0) // jeżeli błąd, to kończymy
+    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0) // jeżeli błąd, to kończymy
     {
         printUsage();
         return -1;
@@ -38,7 +37,7 @@ int main(int argc, char **argv)
         return -3;
     }
 
-    startDaemon(source, destination, interval, recursive, threshold); // program ze startDaemon już nie wraca do maina
+    startDaemon(source, destination, interval, recursive); // program ze startDaemon już nie wraca do maina
 
     return 0; // ani proces rodzicielski ani potomny nie dochodzą do tego miejsca, ale piszemy dla zasady, bo main zwraca int
 }

@@ -14,15 +14,16 @@
 #include <linux/fs.h>
 #include <signal.h>
 
-int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive, unsigned long long *threshold)
+static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
+
+int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu
     if(argc <= 1)
         return -1;
     *interval = 5 * 60; // domyślny czas spania: 5*60 s = 5 min
     *recursive = 0; // domyślnie brak rekurencyjnego synchronizowania katalogów
-    *threshold = ULLONG_MAX; // domyślnie próg dużego pliku wynosi 2^64 - 1 bajtów; jeżeli podamy opcję -t 4096, to pliki o rozmiarze >= 4096 B będą czytane mmapem i zapisywane w folderze docelowym writem
-
+    THRESHOLD = ULLONG_MAX; // domyślnie próg dużego pliku wynosi 2^64 - 1 bajtów; jeżeli podamy opcję -t 4096, to pliki o rozmiarze >= 4096 B będą czytane mmapem i zapisywane w folderze docelowym writem
     int option;
     // umieszczamy ':' na początku __shortopts, aby program mógł rozróżniać między '?' (nieznanym argumentem) i ':' (brakiem podania wartości dla opcji)
     while((option = getopt(argc, argv, ":Ri:t:")) != -1)
@@ -37,7 +38,7 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
                     return -2;
                 break;
             case 't':
-                if(sscanf(optarg, "%llu", threshold) < 1) // ciąg znaków optarg jest progiem dużego pliku; zamieniamy ciąg znaków na unsigned long long; jeżeli sscanf nie wypełnił poprawnie zmiennej threshold, to wartość przekazana do programu ma niepoprawny format
+                if(sscanf(optarg, "%llu", &THRESHOLD) < 1) // ciąg znaków optarg jest progiem dużego pliku; zamieniamy ciąg znaków na unsigned long long; jeżeli sscanf nie wypełnił poprawnie zmiennej threshold, to wartość przekazana do programu ma niepoprawny format
                     return -3;
                 break;
             case ':':
@@ -54,7 +55,6 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
                 break;
         }
     }
-    
     int remainingArguments = argc - optind; // wyznaczamy liczbę argumentów, które nie są opcjami
     if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ściezki źródłowej i docelowej), to kończymy
         return -7;
@@ -84,7 +84,7 @@ void handler(int signo) // funkcja obsługi sygnału SIGUSR1; nie musi nic robi�
 
 // Love R. - "Linux. Programowanie systemowe." strona 177
 // tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
-void startDaemon(char *source, char *destination, unsigned int interval, char recursive, unsigned long long threshold)
+void startDaemon(char *source, char *destination, unsigned int interval, char recursive)
 {
     pid_t pid = fork(); // tworzymy proces potomny
     if(pid == -1) // błąd wywołania fork jeszcze w procesie rodzicielskim; nie powstał proces potomny
