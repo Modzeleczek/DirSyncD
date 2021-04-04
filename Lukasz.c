@@ -128,6 +128,11 @@ void listMergeSort(list *l) {
     }
 }
 
+int removeFile(const char *path)
+{
+    return unlink(path); // unlink służy tylko do usuwania plików; katalog trzeba usunąć rmdirem, ale najpierw trzeba zapewnić, aby był pusty
+}
+
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
     // parsujemy dodatkowe opcje i argumenty programu

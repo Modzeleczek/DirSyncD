@@ -112,4 +112,14 @@ l - lista jednokierunkowa posortowana z wykorzystaniem funkcji cmp porównujące
 */
 void listMergeSort(list *l);
 
+/*
+odczytuje:
+path - ścieżka do pliku bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+
+zwraca:
+-1, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int removeFile(const char *path);
+
 #endif
