@@ -13,8 +13,17 @@
 #include <fcntl.h>
 #include <linux/fs.h>
 #include <signal.h>
+#include <errno.h>
+#include <sys/mman.h>
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
+#define BUFFERSIZE 4096
+
+void stringAppend(char *dst, const size_t offset, const char *src)
+{
+    strcpy(dst + offset, src); // przesuwamy się o offset bajtów względem początku stringa dst; od obliczonej pozycji wklejamy stringa src
+    // możnaby użyć strcat, ale on dokleja src na końcu dst i prawdopodobnie oblicza długość dst strlenem, marnując czas
+}
 
 struct element
 {
@@ -126,6 +135,280 @@ void listMergeSort(list *l) {
         // Otherwise repeat, merging lists twice the size
         insize *= 2;
     }
+}
+
+int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
+{
+    int ret = 0, in = -1, out = -1;
+    if((in = open(srcFilePath, O_RDONLY)) == -1) // deskryptor pliku wejściowego; O_RDONLY - tylko odczyt
+        ret = -1;
+    else // jeżeli in != -1, czyli plik źródłowy został poprawnie otwarty, to open(dstFilePath, ...) się wykona;
+    if((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1) // deskryptor pliku wyjściowego; O_WRONLY - tylko zapis; O_CREAT - utworzenie pliku, jeżeli jeszcze nie istnieje; O_TRUNC - jeżeli plik istnieje, to usunięcie jego zawartości; jeżeli plik jeszcze nie istnieje, to na początku nie dostanie żadnych uprawnień
+        ret = -2;
+    else // jeżeli in != -1 i out != -1, czyli plik źródłowy i docelowy zostały prawidłowo otwarte
+    if(fchmod(out, dstMode) == -1) // ustawiamy plikowi docelowemu uprawnienia dstMode
+        ret = -3;
+    else
+    {
+        if(posix_fadvise(in, 0, 0, POSIX_FADV_SEQUENTIAL) == -1) // str. 124; wysyłamy jądru wskazówkę (poradę), że plik wejściowy będzie odczytywany sekwencyjnie i dlatego należy go wczytywać z wyprzedzeniem
+            ret = 1; // błąd niekrytyczny
+        char *buffer = NULL;
+        if((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL) // optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w metadanych pobranych statem
+            ret = -4;
+        else
+        {
+            while(1) 
+            {
+                // brak obsługi błędów
+                // int readBytes = read(in, buffer, BUFFERSIZE);
+                // write(out, buffer, readBytes);
+                // if(readBytes < BUFFERSIZE)
+                //     break;
+                char *position = buffer; // str. 45; pozycja w buforze wyjściowym
+                size_t remainingBytes = BUFFERSIZE;
+                ssize_t bytesRead;
+                while(remainingBytes != 0 && (bytesRead = read(in, position, remainingBytes)) != 0)
+                {
+                    if(bytesRead == -1)
+                    {
+                        if(errno == EINTR)
+                            continue;
+                        ret = -5;
+                        remainingBytes = BUFFERSIZE; // BUFFERSIZE - BUFFERSIZE == 0, więc druga pętla się nie wykona
+                        bytesRead = 0; // ustawiamy na 0, aby if(bytesRead == 0) zakończył zewnętrzną pętlę
+                        break;
+                    }
+                    remainingBytes -= bytesRead;
+                    position += bytesRead;
+                }
+                position = buffer; // str. 48
+                remainingBytes = BUFFERSIZE - remainingBytes; // zapisujemy całkowitą liczbę odczytanych bajtów, która zawsze jest mniejsza lub równa rozmiarowi bufora
+                ssize_t bytesWritten;
+                while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                {
+                    if(bytesWritten == -1)
+                    {
+                        if(errno == EINTR)
+                            continue;
+                        ret = -6;
+                        bytesRead = 0; // ustawiamy na 0, aby if(bytesRead == 0) zakończył zewnętrzną pętlę
+                        break;
+                    }
+                    remainingBytes -= bytesWritten;
+                    position += bytesWritten;
+                }
+                if(bytesRead == 0) // doszliśmy do końca pliku (EOF) lub wystąpił błąd
+                    break;
+            }
+            free(buffer);
+            if(ret >= 0) // jeżeli nie wystąpiły błędy podczas kopiowania
+            {
+                const struct timespec times[2] = { *dstAccessTime, *dstModificationTime };
+                if(futimens(out, times) == -1) // ustawiamy plikowi wyjściowemu czasy ostatniego dostępu i modyfikacji; czas modyfikacji musi być ustawiony po skończeniu zapisów do pliku wyjściowego, bo zmieniają one go na aktualny czas systemowy
+                    ret = -7;
+            }
+        }
+    }
+    if(in != -1 && close(in) == -1)
+        ret = -8;
+    if(out != -1 && close(out) == -1)
+        ret = -9;
+    return ret;
+}
+
+int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
+{
+    int ret = 0, in = -1, out = -1;
+    if((in = open(srcFilePath, O_RDONLY)) == -1) // deskryptor pliku wejściowego; O_RDONLY - tylko odczyt
+        ret = -1;
+    else // jeżeli in != -1, czyli plik źródłowy został poprawnie otwarty, to open(dstFilePath, ...) się wykona;
+    if((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1) // deskryptor pliku wyjściowego; O_WRONLY - tylko zapis; O_CREAT - utworzenie pliku, jeżeli jeszcze nie istnieje; O_TRUNC - jeżeli plik istnieje, to usunięcie jego zawartości; jeżeli plik jeszcze nie istnieje, to na początku nie dostanie żadnych uprawnień
+        ret = -2;
+    else // jeżeli in != -1 i out != -1, czyli plik źródłowy i docelowy zostały prawidłowo otwarte
+    if(fchmod(out, dstMode) == -1) // ustawiamy plikowi docelowemu uprawnienia dstMode
+        ret = -3;
+    else
+    {
+        char *map;
+        if((map = mmap(0, fileSize, PROT_READ, MAP_SHARED, in, 0)) == MAP_FAILED) // odwzorowujemy (mapujemy) w pamięci plik wejściowy w trybie do odczytu; jeżeli nie udało się zmapować pliku
+            ret = -4;
+        else
+        {
+            if(madvise(map, fileSize, MADV_SEQUENTIAL) == -1) // str. 121; wysyłamy jądru wskazówkę (poradę), że plik wejściowy będzie odczytywany sekwencyjnie
+                ret = 1; // błąd niekrytyczny
+            char *buffer = NULL;
+            if((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL) // optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w metadanych pobranych statem; jeżeli nie udało się zarezerwować pamięci na bufor
+                ret = -5;
+            else
+            {
+                unsigned long long b; // numer bajtu w pliku wejściowym
+                char *position; // pozycja w buforze wyjściowym
+                size_t remainingBytes;
+                ssize_t bytesWritten;
+                for(b = 0; b + BUFFERSIZE < fileSize; b += BUFFERSIZE) // nie może być (b < fileSize - BUFFERSIZE), bo b i fileSize są unsigned, więc jeżeli fileSize < BUFFERSIZE i odejmiemy, to mamy przepełnienie
+                {
+                    memcpy(buffer, map + b, BUFFERSIZE); // kopiujemy BUFFERSIZE (rozmiar bufora) bajtów ze zmapowanej pamięci do bufora zapisu
+                    position = buffer; // str. 48
+                    remainingBytes = BUFFERSIZE; // zapisujemy całkowitą liczbę odczytanych bajtów, która zawsze jest równa rozmiarowi bufora
+                    while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                    {
+                        if(bytesWritten == -1)
+                        {
+                            if(errno == EINTR)
+                                continue;
+                            ret = -6;
+                            b = ULLONG_MAX - BUFFERSIZE; // dla pewności można ustawić b = ULLONG_MAX - BUFFERSIZE; w praktyce fileSize zawsze jest mniejsze od ULLONG_MAX (nie ma plików o rozmiarze 2^64 B), więc można ustawić b = fileSize, aby zakończyć fora i spowodować, że przed poniższą pętlą remainingBytes == 0 - wtedy memcpy nie skopiuje bajtów, a pętla się nie wykona
+                            break;
+                        }
+                        remainingBytes -= bytesWritten;
+                        position += bytesWritten;
+                    }
+                }
+                if(ret >= 0) // jeżeli nie wystąpił błąd podczas dotychczasowego kopiowania
+                {
+                    remainingBytes = fileSize - b; // liczba bajtów z końca pliku, które nie zmieściły się w buforze
+                    memcpy(buffer, map + b, remainingBytes);
+                    position = buffer;
+                    while(remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
+                    {
+                        if(bytesWritten == -1)
+                        {
+                            if(errno == EINTR)
+                                continue;
+                            ret = -7;
+                            break;
+                        }
+                        remainingBytes -= bytesWritten;
+                        position += bytesWritten;
+                    }
+                }
+                free(buffer);
+                if(ret >= 0) // jeżeli nie wystąpiły błędy podczas kopiowania
+                {
+                    const struct timespec times[2] = { *dstAccessTime, *dstModificationTime };
+                    if(futimens(out, times) == -1) // ustawiamy plikowi wyjściowemu czasy ostatniego dostępu i modyfikacji
+                        ret = -8;
+                }
+            }
+            if(munmap(map, fileSize) == -1)
+                ret = -9;
+        }
+    }
+    if(in != -1 && close(in) == -1)
+        ret = -10;
+    if(out != -1 && close(out) == -1)
+        ret = -11;
+    return ret;
+}
+
+int removeFile(const char *path)
+{
+    return unlink(path); // unlink służy tylko do usuwania plików; katalog trzeba usunąć rmdirem, ale najpierw trzeba zapewnić, aby był pusty
+}
+
+int createEmptyDirectory(const char *path, mode_t mode)
+{
+    return mkdir(path, mode);
+}
+
+// ścieżka musi być zakończona '/'
+int removeDirectoryRecursively(const char *path, const size_t pathLength)
+{
+    int ret = 0;
+    DIR *dir = NULL;
+    if((dir = opendir(path)) == NULL)
+        ret = -1;
+    else
+    {
+        list dirs, files;
+        initialize(&dirs);
+        initialize(&files);
+        if(listFilesAndDirectories(dir, &files, &dirs) < 0)
+            ret = -2;
+        else
+        {
+            char *subPath = NULL;
+            if((subPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki podkatalogów i plików; jeżeli nie udało się zarezerwować pamięci
+                ret = -3;
+            else
+            {
+                strcpy(subPath, path); // kopiujemy path do nextPath
+                element *cur = dirs.first;
+                while(cur != NULL)
+                {
+                    stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę podkatalogu do aktualnej ścieżki katalogu
+                    size_t subPathLength = pathLength + strlen(cur->entry->d_name);
+                    stringAppend(subPath, subPathLength++, "/"); // dopisujemy '/' do utworzonej ścieżki
+                    if(removeDirectoryRecursively(subPath, subPathLength) < 0) // rekurencyjnie wywołujemy usuwanie podkatalogów; jeżeli nie udało się usunąć któregoś podkatalogu
+                        ret = -4; // zaznaczamy błąd wyższemu wywołaniu
+                    cur = cur->next;
+                }
+                cur = files.first;
+                while(cur != NULL) // usuwamy pliki z aktualnego katalogu
+                {
+                    stringAppend(subPath, pathLength, cur->entry->d_name); // dopisujemy nazwę pliku do aktualnej ścieżki katalogu
+                    if(removeFile(subPath) == -1) // usuwamy plik
+                        ret = -5;
+                    cur = cur->next;
+                }
+                free(subPath);
+            }
+        }
+        clear(&dirs); // czyścimy listę podkatalogów
+        clear(&files); // czyścimy listę plików
+    }
+    if(dir != NULL && closedir(dir) == -1) // zamykamy aktualny katalog
+        ret = 1; // jeżeli nie uda się zamknąć, to zaznaczamy liczbą dodatnią błąd niekrytyczny wyższemu wywołaniu
+    // błąd krytyczny w funkcji występuje, jeżeli nie uda się usunąć któregokolwiek elementu z podkatalogów aktualnego katalogu
+    if(ret >= 0 && rmdir(path) == -1) // jeżeli nie wystąpił żaden błąd krytyczny, usuwamy aktualny katalog; jeżeli nie uda się usunąć aktualnego katalogu
+        ret = -6; // zaznaczamy błąd krytyczny wyższemu wywołaniu
+    return ret;
+}
+// do usuwania katalogów bez kontekstu, czyli kiedy jako path podamy np. argument programu, którego nie możemy zmieniać
+int startDirectoryRemoval(const char *path)
+{
+    char *rootPath = malloc(sizeof(char) * PATH_MAX); // rezerwujemy PATH_MAX bajtów na ścieżki katalogów
+    strcpy(rootPath, path); // kopiujemy path do rootPath
+    size_t rootPathLength = strlen(rootPath);
+    if(rootPath[rootPathLength - 1] != '/') // jeżeli bezpośrednio przed null terminatorem nie ma '/'
+        stringAppend(rootPath, rootPathLength++, "/"); // wstawiamy '/' na miejscu null terminatora; zwiększamy długość ścieżki o 1; wstawiamy null terminator za '/'
+    int ret = removeDirectoryRecursively(rootPath, rootPathLength);
+    free(rootPath);
+    return ret;
+}
+
+// zakładamy, że podano prawidłowy wskaźnik do listy i do katalogu
+int listFiles(DIR *dir, list *files)
+{
+    struct dirent *entry;
+    errno = 0;
+    while((entry = readdir(dir)) != NULL)
+    {
+        if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
+            pushBack(files, entry);
+    }
+    if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
+        return -1;
+    return 0;
+}
+int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
+{
+    struct dirent *entry;
+    errno = 0;
+    while((entry = readdir(dir)) != NULL)
+    {
+        if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
+            pushBack(files, entry);
+        else if(entry->d_type == DT_DIR) // jeżeli element jest katalogiem (directory)
+        {
+            if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) // jeżeli katalog ma nazwę różną od "." i różną od ".."
+                pushBack(dirs, entry); // dodajemy go do listy katalogów
+        }
+        // elementy o innych typach (symlinki; urządzenia blokowe, tekstowe; sockety; itp.) ignorujemy
+    }
+    if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
+        return -1;
+    return 0;
 }
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)

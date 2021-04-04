@@ -3,6 +3,7 @@
 #define LUKASZ_H
 
 #include <dirent.h>
+#include <sys/stat.h>
 
 /*
 odczytuje:
@@ -42,6 +43,16 @@ recursive - rekurecyjna synchronizacja katalogów
 threshold - minimalna wielkość pliku, żeby był traktowany jako duży
 */
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive);
+
+/*
+odczytuje:
+offset - numer bajtu w ciągu dst, od którego zaczynamy wstawiać ciąg src
+src - ciąg wstawiany do ciągu dst
+
+zapisuje:
+dst - ciąg, do którego wstawiamy ciąg src
+*/
+void stringAppend(char *dst, const size_t offset, const char *src);
 
 typedef struct element element;
 /*
@@ -111,5 +122,100 @@ zapisuje:
 l - lista jednokierunkowa posortowana z wykorzystaniem funkcji cmp porównującej węzły
 */
 void listMergeSort(list *l);
+
+/*
+odczytuje:
+srcFilePath - ścieżka do pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstFilePath - ścieżka do pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstMode - uprawnienia ustawiane plikowi docelowemu
+dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
+dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
+
+/*
+odczytuje:
+srcFilePath - ścieżka do pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+dstFilePath - ścieżka do pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+fileSize - rozmiar w bajtach pliku źródłowego i docelowego po prawidłowym skopiowaniu
+dstMode - uprawnienia ustawiane plikowi docelowemu
+dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
+dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
+
+/*
+odczytuje:
+path - ścieżka do pliku bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+
+zwraca:
+-1, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int removeFile(const char *path);
+
+/*
+odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
+mode - uprawnienia utworzonego katalogu
+
+zwraca:
+-1, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int createEmptyDirectory(const char *path, mode_t mode);
+
+/*
+odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+pathLength - długość ścieżki w bajtach
+
+zwraca:
+< 0, jeżeli wystąpił błąd krytyczny
+> 0, jeżeli wystąpił błąd niekrytyczny
+0, jeżeli nie wystąpił błąd
+*/
+int removeDirectoryRecursively(const char *path, const size_t pathLength);
+/*
+odczytuje:
+path - ścieżka do katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; nie musi być zakończona '/'
+*/
+int startDirectoryRemoval(const char *path);
+
+/*
+odczytuje:
+dir - strumień katalogu otwarty za pomocą opendir
+
+zapisuje:
+files - lista zwykłych plików znajdujących się w katalogu
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int listFiles(DIR *dir, list *files);
+/*
+odczytuje:
+dir - strumień katalogu otwarty za pomocą opendir
+
+zapisuje:
+files - lista zwykłych plików znajdujących się w katalogu
+dirs - lista katalogów znajdujących się w katalogu
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int listFilesAndDirectories(DIR *dir, list *files, list *dirs);
 
 #endif
