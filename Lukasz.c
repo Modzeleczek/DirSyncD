@@ -15,6 +15,7 @@
 #include <signal.h>
 
 static unsigned long long THRESHOLD; // static - zmienna globalna widoczna tylko w tym pliku; extern - zmienna globalna widoczna we wszystkich plikach
+#define BUFFERSIZE 4096
 
 struct element
 {
