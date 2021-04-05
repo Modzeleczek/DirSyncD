@@ -276,5 +276,9 @@ zwraca:
 0, jeżeli nie wystąpił błąd
 */
 int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
+/*
+Funkcja synchronizująca katalogi.
+*/
+typedef int (*synchronizer)(const char *, const size_t, const char *, const size_t);
 
 #endif
