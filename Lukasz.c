@@ -763,6 +763,29 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
         ret = -9;
     return ret;
 }
+int startSynchronization(const char *source, const char *destination, synchronizer synchronize)
+{
+    char *sourcePath = NULL, *destinationPath = NULL;
+    if((sourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów źródłowych
+        return -1;
+    if((destinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów docelowych
+    {
+        free(sourcePath);
+        return -2;
+    }
+    strcpy(sourcePath, source); // kopiujemy source do sourcePath
+    strcpy(destinationPath, destination); // kopiujemy destination do destinationPath
+    size_t sourcePathLength = strlen(sourcePath);
+    if(sourcePath[sourcePathLength - 1] != '/') // jeżeli bezpośrednio przed null terminatorem nie ma '/'
+        stringAppend(sourcePath, sourcePathLength++, "/"); // wstawiamy '/' na miejscu null terminatora; zwiększamy długość ścieżki o 1; wstawiamy null terminator za '/'
+    size_t destinationPathLength = strlen(destinationPath);
+    if(destinationPath[destinationPathLength - 1] != '/') // jeżeli bezpośrednio przed null terminatorem nie ma '/'
+        stringAppend(destinationPath, destinationPathLength++, "/");
+    int ret = synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
+    free(sourcePath);
+    free(destinationPath);
+    return ret;
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {

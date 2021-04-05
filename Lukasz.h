@@ -280,5 +280,16 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
 Funkcja synchronizująca katalogi.
 */
 typedef int (*synchronizer)(const char *, const size_t, const char *, const size_t);
+/*
+odczytuje:
+source - ścieżka do katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; nie musi być zakończona '/'
+destination - ścieżka do katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; nie musi być zakończona '/'
+synchronize - funkcja synchronizująca katalog źródłowy i docelowy (synchronizeNonRecursively lub synchronizeRecursively)
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int startSynchronization(const char *source, const char *destination, synchronizer synchronize);
 
 #endif
