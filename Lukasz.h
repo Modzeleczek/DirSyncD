@@ -264,5 +264,17 @@ zwraca:
 0, jeżeli nie wystąpił błąd
 */
 int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
+/*
+odczytuje:
+sourcePath - ścieżka do katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+sourcePathLength - długość w bajtach ścieżki do katalogu źródłowego
+destinationPath - ścieżka do katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
+destinationPathLength - długość w bajtach ścieżki do katalogu docelowego
+
+zwraca:
+< 0, jeżeli wystąpił błąd
+0, jeżeli nie wystąpił błąd
+*/
+int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
 
 #endif

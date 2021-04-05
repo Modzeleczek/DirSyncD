@@ -676,6 +676,93 @@ int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLen
         ret = -6;
     return ret;
 }
+int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
+{
+    int ret = 0;
+    DIR *dirS = NULL, *dirD = NULL;
+    if((dirS = opendir(sourcePath)) == NULL)
+        ret = -1;
+    else if((dirD = opendir(destinationPath)) == NULL) // jeżeli dirS != NULL, czyli katalog źródłowy został poprawnie otwarty, to opendir(destinationPath) się wykona
+        ret = -2;
+    else
+    {
+        list filesS, dirsS;
+        initialize(&filesS);
+        initialize(&dirsS);
+        list filesD, dirsD;
+        initialize(&filesD);
+        initialize(&dirsD);
+        if(listFilesAndDirectories(dirS, &filesS, &dirsS) < 0)
+            ret = -3;
+        else if(listFilesAndDirectories(dirD, &filesD, &dirsD) < 0)
+            ret = -4;
+        else
+        {
+            listMergeSort(&filesS);
+            listMergeSort(&filesD);
+            updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD);
+            clear(&filesS);
+            clear(&filesD);
+
+            listMergeSort(&dirsS);
+            listMergeSort(&dirsD);
+            char *isReady = NULL; // można zrobić bitmapę (bitset z c++)
+            if((isReady = malloc(sizeof(char) * dirsS.count)) == NULL)
+                ret = -5;
+            else
+            {
+                updateDestinationDirectories(sourcePath, sourcePathLength, &dirsS, destinationPath, destinationPathLength, &dirsD, isReady);
+                // jeszcze nie czyścimy dirsS, bo rekurencyjnie będziemy wywoływać funkcję synchronizeRecursively na katalogach z dirsS
+                clear(&dirsD);
+
+                char *nextSourcePath = NULL, *nextDestinationPath = NULL;
+                if((nextSourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów źródłowych
+                    ret = -6;
+                else if((nextDestinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów docelowych
+                    ret = -7;
+                else
+                {
+                    strcpy(nextSourcePath, sourcePath); // kopiujemy sourcePath do nextSourcePath
+                    strcpy(nextDestinationPath, destinationPath); // kopiujemy destinationPath do nextDestinationPath
+                    element *curS = dirsS.first;
+                    unsigned int i = 0;
+                    while(curS != NULL)
+                    {
+                        if(isReady[i++] == 1) // jeżeli podkatalog jest gotowy do synchronizacji
+                        {
+                            stringAppend(nextSourcePath, sourcePathLength, curS->entry->d_name); // dopisujemy nazwę katalogu do aktualnej ścieżki katalogu źródłowego
+                            size_t nextSourcePathLength = sourcePathLength + strlen(curS->entry->d_name);
+                            stringAppend(nextSourcePath, nextSourcePathLength, "/"); // dopisujemy '/' do utworzonej ścieżki
+                            nextSourcePathLength += 1; // +1, bo dopisaliśmy '/'
+
+                            stringAppend(nextDestinationPath, destinationPathLength, curS->entry->d_name); // dopisujemy nazwę katalogu do aktualnej ścieżki katalogu docelowego
+                            size_t nextDestinationPathLength = destinationPathLength + strlen(curS->entry->d_name);
+                            stringAppend(nextDestinationPath, nextDestinationPathLength, "/"); // dopisujemy '/' do utworzonej ścieżki
+                            nextDestinationPathLength += 1; // +1, bo dopisaliśmy '/'
+
+                            synchronizeRecursively(nextSourcePath, nextSourcePathLength, nextDestinationPath, nextDestinationPathLength); // ignorujemy błędy synchronizacji podkatalogów
+                        } // jeżeli podkatalog nie jest gotowy do synchronizacji, to go pomijamy
+                        curS = curS->next;
+                    }
+                }
+                free(isReady);
+                if(nextSourcePath != NULL)
+                    free(nextSourcePath);
+                if(nextDestinationPath != NULL)
+                    free(nextDestinationPath);
+            }
+        }
+        clear(&dirsS); // czyścimy dirsS
+        if(dirsD.count != 0) // jeżeli nie udało się zarezerwować pamięci na isReady
+            clear(&dirsD);
+    }
+    // zamknąć katalog można dopiero, gdy skończymy używać obiektów typu dirent, które odczytaliśmy readdirem na tym katalogu, bo są one usuwane z pamięci w momencie zamknięcia katalogu closedirem
+    if(dirS != NULL && closedir(dirS) == -1) // jeżeli dirS == NULL, to closedir(dirS) się nie wykona
+        ret = -8;
+    if(dirD != NULL && closedir(dirD) == -1)
+        ret = -9;
+    return ret;
+}
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
