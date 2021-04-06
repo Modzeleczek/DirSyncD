@@ -924,6 +924,15 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             ret = -14;
         else if(sigaddset(&set, SIGTERM) == -1) // dodajemy SIGTERM do zbioru sygnałów
             ret = -15;
+        else
+        {
+            size_t sourcePathLength = strlen(sourcePath);
+            if(sourcePath[sourcePathLength - 1] != '/') // jeżeli bezpośrednio przed null terminatorem nie ma '/'
+                stringAppend(sourcePath, sourcePathLength++, "/"); // wstawiamy '/' na miejscu null terminatora; zwiększamy długość ścieżki o 1; wstawiamy null terminator za '/'
+            size_t destinationPathLength = strlen(destinationPath);
+            if(destinationPath[destinationPathLength - 1] != '/')
+                stringAppend(destinationPath, destinationPathLength++, "/");
+        }
     }
     if(sourcePath != NULL)
         free(sourcePath);
