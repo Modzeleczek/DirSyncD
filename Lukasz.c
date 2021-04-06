@@ -763,6 +763,7 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
         ret = -9;
     return ret;
 }
+// do synchronizacji bez kontekstu
 int startSynchronization(const char *source, const char *destination, synchronizer synchronize)
 {
     char *sourcePath = NULL, *destinationPath = NULL;
