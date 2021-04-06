@@ -865,16 +865,20 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
     }
     // poniższy kod wykonuje się w procesie potomnym, bo w nim pid == 0; przekształcamy proces potomny w demona
     int ret = 0;
-    char *sourceAbsolutePath = NULL, *destinationAbsolutePath = NULL;
-    if((sourceAbsolutePath = realpath(source, NULL)) == NULL) // wyznaczamy ścieżkę bezwzględną katalogu źródłowego
+    char *sourcePath = NULL, *destinationPath = NULL;
+    if((sourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę katalogu źródłowego
+        ret = -1;
+    else if((destinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę katalogu docelowego
+        ret = -2;
+    else if(realpath(source, sourcePath) == NULL) // wyznaczamy ścieżkę bezwzględną katalogu źródłowego
     {
         perror("realpath; source");
-        ret = -1;
+        ret = -3;
     }
-    else if((destinationAbsolutePath = realpath(destination, NULL)) == NULL) // wyznaczamy ścieżkę bezwzględną katalogu docelowego
+    else if(realpath(destination, destinationPath) == NULL) // wyznaczamy ścieżkę bezwzględną katalogu docelowego
     {
         perror("realpath; destination");
-        ret = -2;
+        ret = -4;
     }
     else if(setsid() == -1) // tworzymy nową sesję i grupę procesów
         ret = -3; // nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
@@ -903,9 +907,12 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         else if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
             ret = -9;
     }
-    if(sourceAbsolutePath != NULL)
-        free(sourceAbsolutePath);
-    if(destinationAbsolutePath != NULL)
-        free(destinationAbsolutePath);
+    if(sourcePath != NULL)
+        free(sourcePath);
+    if(destinationPath != NULL)
+        free(destinationPath);
+    openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
+    syslog(LOG_INFO, "zakonczenie %i", ret);
+    closelog();
     exit(ret); // zamykamy proces demona
 }
