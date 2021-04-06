@@ -943,6 +943,11 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                 synchronize = synchronizeRecursively;
             stop = 0;
             forcedSynchronization = 0;
+            while(1)
+            {
+                sleep(interval); // usypiamy demona
+                synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
+            }
         }
     }
     if(sourcePath != NULL)
