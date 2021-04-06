@@ -47,9 +47,11 @@ void initialize(list *l)
     l->first = l->last = NULL;
     l->count = 0;
 }
-void pushBack(list *l, struct dirent *newEntry)
+int pushBack(list *l, struct dirent *newEntry)
 {
-    element *new = malloc(sizeof(element));
+    element *new = NULL;
+    if((new = malloc(sizeof(element))) == NULL)
+        return -1;
     new->entry = newEntry;
     new->next = NULL;
     if(l->first == NULL) // jeżeli lista jest pusta, to first i last są NULLami
@@ -63,6 +65,7 @@ void pushBack(list *l, struct dirent *newEntry)
         l->last = new; // przestawiamy aktualny last na nowy
     }
     ++l->count;
+    return 0;
 }
 void clear(list *l)
 {

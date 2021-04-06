@@ -87,7 +87,7 @@ newEntry - element katalogu, który dodajemy na koniec listy
 zapisuje:
 l - lista jednokierunkowa ze wstawionym na końcu węzłem zawierającym element katalogu newEntry
 */
-void pushBack(list *l, struct dirent *newEntry);
+int pushBack(list *l, struct dirent *newEntry);
 /*
 zapisuje:
 l - pusta lista jednokierunkowa przeznaczona do ponownego użycia
