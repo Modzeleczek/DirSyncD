@@ -716,10 +716,10 @@ int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLen
         clear(&filesD);
     }
     // zamknąć katalog można dopiero, gdy skończymy używać obiektów typu dirent, które odczytaliśmy readdirem na tym katalogu, bo są one usuwane z pamięci w momencie zamknięcia katalogu closedirem
-    if(dirS != NULL && closedir(dirS) == -1) // jeżeli dirS == NULL, to closedir(dirS) się nie wykona
-        ret = -5;
-    if(dirD != NULL && closedir(dirD) == -1)
-        ret = -6;
+    if(dirS != NULL) // jeżeli dirS == NULL, to closedir(dirS) się nie wykona
+        closedir(dirS); // ignorujemy błąd zamknięcia katalogu
+    if(dirD != NULL)
+        closedir(dirD);
     return ret;
 }
 int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
