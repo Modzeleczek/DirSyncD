@@ -845,8 +845,9 @@ int directoryValid(const char *path)
     return 0; // katalog istnieje i operacje na nim nie powodują błędów
 }
 
-void handler(int signo) // funkcja obsługi sygnału SIGUSR1; nie musi nic robić, bo służy tylko do przerwania spania - powrót procesu demona ze stanu oczekiwania do stanu gotowego
-{ }
+void sigusr1Handler(int signo) // funkcja obsługi sygnału SIGUSR1
+{
+}
 
 // Love R. - "Linux. Programowanie systemowe." strona 177
 // tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
@@ -908,8 +909,8 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         else if(dup(0) == -1) // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
             ret = -10;
         // jeżeli nie wystąpił błąd, to w tym momencie proces potomny jest już demonem
-        else if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
-            ret = -9;
+        else if(signal(SIGUSR1, sigusr1Handler) == SIG_ERR) // rejestrujemy funkcji obsługującą sygnał SIGUSR1
+            ret = -11;
     }
     if(sourcePath != NULL)
         free(sourcePath);
