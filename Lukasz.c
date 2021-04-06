@@ -849,8 +849,10 @@ void sigusr1Handler(int signo) // funkcja obsługi sygnału SIGUSR1
 {
 }
 
+char stop;
 void sigtermHandler(int signo) // funkcja obsługi sygnału SIGTERM
 {
+    stop = 1;
 }
 
 // Love R. - "Linux. Programowanie systemowe." strona 177
@@ -937,6 +939,7 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                 synchronize = synchronizeNonRecursively;
             else
                 synchronize = synchronizeRecursively;
+            stop = 0;
         }
     }
     if(sourcePath != NULL)
