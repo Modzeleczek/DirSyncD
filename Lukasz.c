@@ -572,7 +572,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
     element *curS = filesSrc->first, *curD = filesDst->first;
     struct stat srcFile, dstFile;
     unsigned int i = 0;
-    int status = 0;
+    int status = 0, ret = 0;
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
     while(curS != NULL && curD != NULL)
     {
@@ -585,6 +585,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
             stringAppend(dstFilePath, length++, "/"); // dopisujemy '/' do ścieżki usuwanego katalogu
             status = removeDirectoryRecursively(dstFilePath, length);
             syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstFilePath, status);
+            if(status != 0) ret = 1;
             curD = curD->next;
         }
         else
@@ -597,11 +598,13 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 {
                     syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, errno);
                     isReady[i++] = 0; // zaznaczamy, że katalog nie jest gotowy do synchronizacji, bo nie istnieje
+                    ret = 2;
                 }
                 else // if(comparison == 0)
                 {
                     syslog(LOG_INFO, "odczytujemy metadane katalogu źródłowego %s; %i\n", srcFilePath, errno);
                     isReady[i++] = 1; // jeżeli nie udało się sprawdzić, czy katalog docelowy ma takie same uprawnienia, jak źródłowy, to zakładamy, że ma
+                    ret = 3;
                     curD = curD->next; // przesuwamy wskaźnik na liście docelowej
                 }
                 continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
@@ -611,7 +614,11 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę katalogu do stworzenia do ścieżki katalogu docelowego
                 status = createEmptyDirectory(dstFilePath, srcFile.st_mode); // tworzymy w katalogu docelowym katalog o nazwie takiej, jak w katalogu źródłowym; nie przepisujemy czasu modyfikacji, bo nie zwracamy na niego uwagi przy synchronizacji - wszystkie katalogi i tak będą rekurencyjnie przejrzane w celu wykrycia zmian plików
                 syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, status);
-                if(status < 0) isReady[i++] = 0;
+                if(status < 0)
+                {
+                    isReady[i++] = 0;
+                    ret = 4;
+                }
                 else isReady[i++] = 1;
                 curS = curS->next;
             }
@@ -620,13 +627,19 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 isReady[i++] = 1;
                 stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę katalogu docelowego do ścieżki katalogu (korzenia) docelowego
                 if(stat(dstFilePath, &dstFile) == -1) // odczytujemy metadane katalogu docelowego
+                {
                     syslog(LOG_INFO, "odczytujemy metadane katalogu docelowego %s; %i\n", dstFilePath, errno);
+                    ret = 5;
+                }
                 else // jeżeli poprawnie odczytaliśmy metadane
                 // if(srcFile.st_mtim.tv_sec != dstFile.st_mtim.tv_sec || srcFile.st_mtim.tv_nsec != dstFile.st_mtim.tv_nsec) // ignorujemy czas modyfikacji zawartości (zmienia się on podczas tworzenia i usuwania plików z katalogu)
                 if(srcFile.st_mode != dstFile.st_mode) // jeżeli katalogi mają różne uprawnienia
                 {
                     if(chmod(dstFilePath, srcFile.st_mode) == -1) // przepisujemy uprawnienia z katalogu źródłowego do katalogu docelowego
+                    {
                         status = errno;
+                        ret = 6;
+                    }
                     else
                         status = 0;
                     syslog(LOG_INFO, "przepisujemy uprawnienia katalogu %s do %s; %i\n", srcFilePath, dstFilePath, status);
@@ -644,6 +657,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
         stringAppend(dstFilePath, length++, "/"); // dopisujemy '/' do ścieżki usuwanego katalogu
         status = removeDirectoryRecursively(dstFilePath, length);
         syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstFilePath, status);
+        ret = 7;
         curD = curD->next;
     }
     while(curS != NULL) // kopiujemy pozostałe katalogi z katalogu źródłowego, począwszy od aktualnie wskazywanego przez curS
@@ -655,19 +669,24 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
             curS = curS->next; // przesuwamy wskaźnik na liście źródłowej
             syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, errno);
             isReady[i++] = 0; // zaznaczamy, że katalog nie jest gotowy do synchronizacji, bo nie istnieje
+            ret = 8;
             continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
         }
         stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę katalogu do stworzenia do ścieżki katalogu docelowego
         status = createEmptyDirectory(dstFilePath, srcFile.st_mode);
         syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstFilePath, status);
-        if(status < 0) isReady[i++] = 0;
+        if(status < 0)
+        {
+            isReady[i++] = 0;
+            ret = 9;
+        }
         else isReady[i++] = 1;
         curS = curS->next;
     }
     free(srcFilePath);
     free(dstFilePath);
     closelog();
-    return 0;
+    return ret;
 }
 
 int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
