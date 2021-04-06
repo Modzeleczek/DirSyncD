@@ -905,6 +905,7 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         // jeżeli są otwarte, to zamykamy dalsze deskryptory - od 3 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
         for(i = 3; i <= 1023; ++i)
             close(i); // jeżeli nie uda się zamknąć któregoś deskryptora, to ignorujemy błąd
+        sigset_t set;
         // przeadresowujemy deskryptory 0, 1, 2 na /dev/null
         if(open("/dev/null", O_RDWR) == -1) // deskryptor 0 (stdin; najmniejszy wolny) wskazuje teraz na /dev/null
             ret = -8;
@@ -917,6 +918,12 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             ret = -11;
         else if(signal(SIGTERM, sigtermHandler) == SIG_ERR) // rejestrujemy funkcji obsługującą sygnał SIGTERM
             ret = -12;
+        else if(sigemptyset(&set) == -1) // inicjujemy zbiór sygnałów
+            ret = -13;
+        else if(sigaddset(&set, SIGUSR1) == -1) // dodajemy SIGUSR1 do zbioru sygnałów
+            ret = -14;
+        else if(sigaddset(&set, SIGTERM) == -1) // dodajemy SIGTERM do zbioru sygnałów
+            ret = -15;
     }
     if(sourcePath != NULL)
         free(sourcePath);
