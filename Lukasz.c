@@ -849,6 +849,10 @@ void sigusr1Handler(int signo) // funkcja obsługi sygnału SIGUSR1
 {
 }
 
+void sigtermHandler(int signo) // funkcja obsługi sygnału SIGTERM
+{
+}
+
 // Love R. - "Linux. Programowanie systemowe." strona 177
 // tworzymy proces potomny, kończymy proces rodzicielski (uruchamiacz demona), przekształcamy proces potomny w demona
 void startDaemon(char *source, char *destination, unsigned int interval, char recursive)
@@ -911,6 +915,8 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         // jeżeli nie wystąpił błąd, to w tym momencie proces potomny jest już demonem
         else if(signal(SIGUSR1, sigusr1Handler) == SIG_ERR) // rejestrujemy funkcji obsługującą sygnał SIGUSR1
             ret = -11;
+        else if(signal(SIGTERM, sigtermHandler) == SIG_ERR) // rejestrujemy funkcji obsługującą sygnał SIGTERM
+            ret = -12;
     }
     if(sourcePath != NULL)
         free(sourcePath);
