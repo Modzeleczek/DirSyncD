@@ -950,7 +950,10 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
                     syslog(LOG_INFO, "uspienie");
                     closelog();
-                    sleep(interval); // usypiamy demona
+                    unsigned int timeLeft = sleep(interval); // usypiamy demona
+                    openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
+                    syslog(LOG_INFO, "obudzenie; przespano %u s", interval - timeLeft);
+                    closelog();
                     if(stop == 1)
                         break;
                 }
