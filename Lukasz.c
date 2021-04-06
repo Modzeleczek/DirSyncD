@@ -845,8 +845,10 @@ int directoryValid(const char *path)
     return 0; // katalog istnieje i operacje na nim nie powodują błędów
 }
 
+char forcedSynchronization;
 void sigusr1Handler(int signo) // funkcja obsługi sygnału SIGUSR1
 {
+    forcedSynchronization = 1;
 }
 
 char stop;
@@ -940,6 +942,7 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             else
                 synchronize = synchronizeRecursively;
             stop = 0;
+            forcedSynchronization = 0;
         }
     }
     if(sourcePath != NULL)
