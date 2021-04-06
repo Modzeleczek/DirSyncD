@@ -945,13 +945,17 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             forcedSynchronization = 0;
             while(1)
             {
-                sleep(interval); // usypiamy demona
+                if(forcedSynchronization == 0) // jeżeli nie wymuszono synchronizacji sygnałem SIGUSR1, to możemy spać
+                {
+                    sleep(interval); // usypiamy demona
+                }
                 if(sigprocmask(SIG_BLOCK, &set, NULL) == -1) // włączamy blokowanie sygnałów ze zbioru: SIGUSR1 i SIGTERM
                 {
                     ret = -16;
                     break;
                 }
                 synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
+                forcedSynchronization = 0;
                 if(sigprocmask(SIG_UNBLOCK, &set, NULL) == -1) // wyłączamy blokowanie sygnałów ze zbioru: SIGUSR1 i SIGTERM
                 {
                     ret = -17;
