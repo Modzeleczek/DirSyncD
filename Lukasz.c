@@ -948,6 +948,8 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                 if(forcedSynchronization == 0) // jeżeli nie wymuszono synchronizacji sygnałem SIGUSR1, to możemy spać
                 {
                     sleep(interval); // usypiamy demona
+                    if(stop == 1)
+                        break;
                 }
                 if(sigprocmask(SIG_BLOCK, &set, NULL) == -1) // włączamy blokowanie sygnałów ze zbioru: SIGUSR1 i SIGTERM
                 {
@@ -961,6 +963,8 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                     ret = -17;
                     break;
                 }
+                if(forcedSynchronization == 0 && stop == 1)
+                    break;
             }
         }
     }
