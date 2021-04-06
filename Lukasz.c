@@ -932,6 +932,11 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             size_t destinationPathLength = strlen(destinationPath);
             if(destinationPath[destinationPathLength - 1] != '/')
                 stringAppend(destinationPath, destinationPathLength++, "/");
+            synchronizer synchronize;
+            if(recursive == 0)
+                synchronize = synchronizeNonRecursively;
+            else
+                synchronize = synchronizeRecursively;
         }
     }
     if(sourcePath != NULL)
