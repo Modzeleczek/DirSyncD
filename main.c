@@ -21,10 +21,9 @@ int main(int argc, char **argv)
     char *source, *destination;
     unsigned int interval;
     char recursive;
-    unsigned long long threshold;
-    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive, &threshold) < 0) // jeżeli błąd, to kończymy
+    if(parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0) // jeżeli błąd, to kończymy
     {
-        printUsage();
+        printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
         return -1;
     }
     if(directoryValid(source) < 0) // jeżeli operacje na katalogu źródłowym powodują błąd, to kończymy
@@ -38,5 +37,7 @@ int main(int argc, char **argv)
         return -3;
     }
 
-    return 0;
+    startDaemon(source, destination, interval, recursive); // program ze startDaemon już nie wraca do maina
+
+    return 0; // ani proces rodzicielski ani potomny nie dochodzą do tego miejsca, ale piszemy dla zasady, bo main zwraca int
 }
