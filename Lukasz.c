@@ -963,6 +963,10 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                     ret = -17;
                     break;
                 }
+                // jeżeli podczas synchronizacji odebraliśmy SIGUSR1 lub SIGTERM, to po wyłączeniu ich blokowania zostaną wykonane funkcje ich obsługi
+                // jeżeli podczas synchronizacji odebraliśmy SIGUSR1, to po jej zakończeniu od razu zostanie wykonana kolejna synchronizacja
+                // jeżeli podczas synchronizacji nie odebraliśmy SIGUSR1 i odebraliśmy SIGTERM, to po jej zakończeniu demon się zakończy
+                // jeżeli podczas synchronizacji odebraliśmy SIGUSR1 i SIGTERM, to po jej zakończeniu najpierw zostanie wykonana kolejna synchronizacja, a jeżeli podczas niej nie odbierzemy SIGUSR1, to po niej demon się zakończy; jeżeli jednak podczas tej drugiej synchronizacji odbierzemy SIGUSR1, to zostanie wykonana trzecia synchronizacja, itd.; po zakończeniu pierwszej synchronizacji, podczas której nie odbierzemy SIGUSR1, demon się zakończy
                 if(forcedSynchronization == 0 && stop == 1)
                     break;
             }
