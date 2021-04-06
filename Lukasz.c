@@ -710,7 +710,8 @@ int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLen
         {
             listMergeSort(&filesS);
             listMergeSort(&filesD);
-            updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD); // ignorujemy błędy synchronizacji, bo i tak statusy operacji na plikach są zapisywane w logu
+            if(updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD) != 0) // jeżeli wystąpił błąd synchronizacji katalogu
+                ret = -5;
         }
         clear(&filesS);
         clear(&filesD);
