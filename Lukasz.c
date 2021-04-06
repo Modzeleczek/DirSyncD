@@ -962,7 +962,10 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
                     ret = -16;
                     break;
                 }
-                synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
+                int status = synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
+                openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
+                syslog(LOG_INFO, "koniec synchronizacji; %i", status);
+                closelog();
                 forcedSynchronization = 0;
                 if(sigprocmask(SIG_UNBLOCK, &set, NULL) == -1) // wyłączamy blokowanie sygnałów ze zbioru: SIGUSR1 i SIGTERM
                 {
