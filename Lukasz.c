@@ -437,7 +437,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
     strcpy(dstFilePath, dstDirPath); // kopiujemy ścieżkę katalogu docelowego do dstFilePath
     element *curS = filesSrc->first, *curD = filesDst->first;
     struct stat srcFile, dstFile;
-    int status = 0;
+    int status = 0, ret = 0;
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
     while(curS != NULL && curD != NULL)
     {
@@ -448,6 +448,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
             stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
             status = removeFile(dstFilePath); // usuwamy plik docelowy
             syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+            if(status != 0) ret = 1;
             curD = curD->next;
         }
         else
@@ -457,11 +458,15 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
             {
                 curS = curS->next; // przesuwamy wskaźnik na liście źródłowej
                 if(comparison < 0)
+                {
                     syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno); // status zapisany przez stat do errno (liczba dodatnia)
+                    ret = 2;
+                }
                 else // if(comparison == 0)
                 {
                     syslog(LOG_INFO, "odczytujemy metadane pliku źródłowego %s; %i\n", srcFilePath, errno);
                     curD = curD->next; // przesuwamy wskaźnik na liście docelowej
+                    ret = 3;
                 }
                 continue; // przechodzimy do następnej iteracji, ale nie przerywamy algorytmu
             }
@@ -474,13 +479,17 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                 else
                     status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
                 syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status); // nie przerywamy, jeżeli nie udało się skopiować pliku, ale wypisujemy status operacji
+                if(status != 0) ret = 4;
                 curS = curS->next;
             }
             else // srcFileName == dstFileName
             {
                 stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
                 if(stat(dstFilePath, &dstFile) == -1) // odczytujemy metadane pliku docelowego
+                {
                     syslog(LOG_INFO, "odczytujemy metadane pliku docelowego %s; %i\n", dstFilePath, errno);
+                    ret = 5;
+                }
                 else // jeżeli poprawnie odczytaliśmy metadane
                 if(srcFile.st_mtim.tv_sec != dstFile.st_mtim.tv_sec || srcFile.st_mtim.tv_nsec != dstFile.st_mtim.tv_nsec) // srcFile.st_mtim != dstFile.st_mtim; jeżeli plik docelowy ma inny czas modyfikacji (wcześniejszy - jest nieaktualny lub późniejszy - został edytowany)
                 {
@@ -490,13 +499,17 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                     else
                         status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
                     syslog(LOG_INFO, "przepisujemy %s do %s; %i\n", srcFilePath, dstFilePath, status); // nie przerywamy, jeżeli nie udało się przepisać pliku, ale wypisujemy status operacji
+                    if(status != 0) ret = 6;
                 }
                 else // przy kopiowaniu przepisujemy uprawnienia, ale jeżeli nie przepisywaliśmy pliku, to sprawdzamy, czy pliki nie mają różnych uprawnień
                 // if(srcFile.st_ctim.tv_sec != dstFile.st_ctim.tv_sec || srcFile.st_ctim.tv_nsec != dstFile.st_ctim.tv_nsec) // jeżeli plik docelowy ma inny czas zmiany (czas modyfikacji metadanych m. in. uprawnień, właściciela, atim, mtim, itp.); aby zmienić czas zmiany (ctim), trzeba przestawić czas systemowy, wprowadzić jakąś zmianę w metadanych pliku i z przywrócić czas systemowy; zmiana czasy systemowego może zaburzyć inne procesy, więc tego nie robimy
                 if(srcFile.st_mode != dstFile.st_mode) // jeżeli pliki mają różne uprawnienia
                 {
                     if(chmod(dstFilePath, srcFile.st_mode) == -1) // przepisujemy uprawnienia z pliku źródłowego do katalogu docelowego
+                    {
                         status = errno;
+                        ret = 7;
+                    }
                     else
                         status = 0;
                     syslog(LOG_INFO, "przepisujemy uprawnienia pliku %s do %s; %i\n", srcFilePath, dstFilePath, status);
@@ -512,6 +525,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
         stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
         status = removeFile(dstFilePath);
         syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+        if(status != 0) ret = 8;
         curD = curD->next;
     }
     while(curS != NULL) // kopiujemy pozostałe pliki z katalogu źródłowego, począwszy od aktualnie wskazywanego przez curS
@@ -519,7 +533,10 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
         char *srcFileName = curS->entry->d_name;
         stringAppend(srcFilePath, srcDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu źródłowego
         if(stat(srcFilePath, &srcFile) == -1) // odczytujemy metadane pliku źródłowego
+        {
             syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
+            ret = 9;
+        }
         else
         {
             stringAppend(dstFilePath, dstDirPathLength, srcFileName); // dopisujemy nazwę pliku źródłowego do ścieżki katalogu docelowego
@@ -529,13 +546,14 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
             else
                 status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
             syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
+            if(status != 0) ret = 10;
         }
         curS = curS->next;
     }
     free(srcFilePath);
     free(dstFilePath);
     closelog();
-    return 0;
+    return ret;
 }
 // wszędzie w nazwach zmiennych wyraz "file" jest użyty w znaczeniu "katalog", bo nie chce mi się zmieniać, a katalog to też plik
 int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst, char *isReady)
