@@ -747,7 +747,8 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
         {
             listMergeSort(&filesS);
             listMergeSort(&filesD);
-            updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD);
+            if(updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD) != 0)
+                ret = -5;
             clear(&filesS);
             clear(&filesD);
 
@@ -755,18 +756,19 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
             listMergeSort(&dirsD);
             char *isReady = NULL; // można zrobić bitmapę (bitset z c++)
             if((isReady = malloc(sizeof(char) * dirsS.count)) == NULL)
-                ret = -5;
+                ret = -6;
             else
             {
-                updateDestinationDirectories(sourcePath, sourcePathLength, &dirsS, destinationPath, destinationPathLength, &dirsD, isReady);
+                if(updateDestinationDirectories(sourcePath, sourcePathLength, &dirsS, destinationPath, destinationPathLength, &dirsD, isReady) != 0)
+                    ret = -7;
                 // jeszcze nie czyścimy dirsS, bo rekurencyjnie będziemy wywoływać funkcję synchronizeRecursively na katalogach z dirsS
                 clear(&dirsD);
 
                 char *nextSourcePath = NULL, *nextDestinationPath = NULL;
                 if((nextSourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów źródłowych
-                    ret = -6;
+                    ret = -8;
                 else if((nextDestinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżki katalogów docelowych
-                    ret = -7;
+                    ret = -9;
                 else
                 {
                     strcpy(nextSourcePath, sourcePath); // kopiujemy sourcePath do nextSourcePath
@@ -787,7 +789,8 @@ int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength
                             stringAppend(nextDestinationPath, nextDestinationPathLength, "/"); // dopisujemy '/' do utworzonej ścieżki
                             nextDestinationPathLength += 1; // +1, bo dopisaliśmy '/'
 
-                            synchronizeRecursively(nextSourcePath, nextSourcePathLength, nextDestinationPath, nextDestinationPathLength); // ignorujemy błędy synchronizacji podkatalogów
+                            if(synchronizeRecursively(nextSourcePath, nextSourcePathLength, nextDestinationPath, nextDestinationPathLength) < 0) // jeżeli wystąpił błąd synchronizacji podkatalogu
+                                ret = -10;
                         } // jeżeli podkatalog nie jest gotowy do synchronizacji, to go pomijamy
                         curS = curS->next;
                     }
