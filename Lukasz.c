@@ -390,11 +390,11 @@ int listFiles(DIR *dir, list *files)
     errno = 0;
     while((entry = readdir(dir)) != NULL)
     {
-        if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
-            pushBack(files, entry);
+        if(entry->d_type == DT_REG && pushBack(files, entry) < 0) // jeżeli element jest zwykłym plikiem (regular file) i wystąpił błąd podczas dodawania elementu
+            return -1; // przerywamy, bo listy elementów muszą być kompletne do porównywania katalogów
     }
     if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
-        return -1;
+        return -2;
     return 0;
 }
 int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
@@ -404,16 +404,20 @@ int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
     while((entry = readdir(dir)) != NULL)
     {
         if(entry->d_type == DT_REG) // jeżeli element jest zwykłym plikiem (regular file)
-            pushBack(files, entry);
+        {
+            if(pushBack(files, entry) < 0)
+                return -1;
+        }
         else if(entry->d_type == DT_DIR) // jeżeli element jest katalogiem (directory)
         {
-            if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) // jeżeli katalog ma nazwę różną od "." i różną od ".."
-                pushBack(dirs, entry); // dodajemy go do listy katalogów
+            if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && 
+                pushBack(dirs, entry) < 0) // jeżeli katalog ma nazwę różną od "." i różną od "..", dodajemy go do listy katalogów
+                return -2;
         }
         // elementy o innych typach (symlinki; urządzenia blokowe, tekstowe; sockety; itp.) ignorujemy
     }
     if(errno != 0) // jeżeli wystąpił błąd podczas odczytywania elementu
-        return -1;
+        return -3;
     return 0;
 }
 
