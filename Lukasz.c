@@ -947,6 +947,9 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
             {
                 if(forcedSynchronization == 0) // jeżeli nie wymuszono synchronizacji sygnałem SIGUSR1, to możemy spać
                 {
+                    openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON); // otwieramy połączenie z logiem /var/log/syslog
+                    syslog(LOG_INFO, "uspienie");
+                    closelog();
                     sleep(interval); // usypiamy demona
                     if(stop == 1)
                         break;
