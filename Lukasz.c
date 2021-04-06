@@ -881,28 +881,32 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
         ret = -4;
     }
     else if(setsid() == -1) // tworzymy nową sesję i grupę procesów
-        ret = -3; // nie wywołujemy perror, bo w procesie potomnym nie możemy wypisać błędu do terminala uruchamiającego proces rodzicielski
+        ret = -5; // nie wywołujemy perror, bo w procesie potomnym nie możemy już wypisać błędu do terminala uruchamiającego proces rodzicielski
     else if(chdir("/") == -1) // ustawiamy katalog roboczy procesu na /
-        ret = -4;
+        ret = -6;
     else
     {
         int i;
-        for(i = 0; i < 1023; ++i) // zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2) i dalsze deskryptory - łącznie od 0 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
+        for(i = 0; i <= 2; ++i) // obowiązkowo zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2)
             if(close(i) == -1) // jeżeli nie uda się zamknąć któregoś deskryptora
             {
-                ret = -5;
+                ret = -(50 + i);
                 break;
             }
     }
     if(ret >= 0)
     {
+        int i;
+        // jeżeli są otwarte, to zamykamy dalsze deskryptory - od 3 do 1023, bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory
+        for(i = 3; i <= 1023; ++i)
+            close(i); // jeżeli nie uda się zamknąć któregoś deskryptora, to ignorujemy błąd
         // przeadresowujemy deskryptory 0, 1, 2 na /dev/null
-        if(open("/dev/null", O_RDWR) == -1) // deskryptor 0 (stdin) wskazuje teraz na /dev/null
-            ret = -6;
-        else if(dup(0) == -1) // deskryptor 1 (stdout) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
-            ret = -7;
-        else if(dup(0) == -1) // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+        if(open("/dev/null", O_RDWR) == -1) // deskryptor 0 (stdin; najmniejszy wolny) wskazuje teraz na /dev/null
             ret = -8;
+        else if(dup(0) == -1) // deskryptor 1 (stdout) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+            ret = -9;
+        else if(dup(0) == -1) // deskryptor 2 (stderr) wskazuje teraz na to samo co deskryptor 0 - na /dev/null
+            ret = -10;
         // jeżeli nie wystąpił błąd, to w tym momencie proces potomny jest już demonem
         else if(signal(SIGUSR1, handler) == SIG_ERR) // błąd podczas rejestrowania funkcji obsługującej sygnał SIGUSR1
             ret = -9;
