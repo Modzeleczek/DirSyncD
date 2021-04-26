@@ -1,6 +1,4 @@
-#include "Anna.h"
 #include "Lukasz.h"
-#include "Mariusz.h"
 
 #include <unistd.h>
 #include <sys/types.h>
