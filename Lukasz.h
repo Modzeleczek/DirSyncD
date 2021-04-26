@@ -1,6 +1,5 @@
-// include guardy
-#ifndef LUKASZ_H
-#define LUKASZ_H
+#ifndef DIRSYNCD_H
+#define DIRSYNCD_H
 
 #include <dirent.h>
 #include <sys/stat.h>
