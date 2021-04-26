@@ -15,6 +15,59 @@
 #include <sys/mman.h>
 #include <syslog.h>
 
+/*
+argumenty:
+sciezka_zrodlowa - ścieżka do katalogu, z którego kopiujemy
+sciezka_docelowa - ścieżka do katalogu, do którego kopiujemy
+dodatkowe opcje:
+-i <czas_spania> - czas spania
+-R - rekurencyjna synchronizacja katalogów
+-t <prog_duzego_pliku> - minimalny rozmiar pliku, żeby był on potraktowany jako duży
+sposób użycia:
+DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa
+wysłanie sygnału SIGUSR1 do demona:
+- podczas spania - przedwczesne obudzenie
+- podczas synchronizacji - wymuszenie ponownej synchronizacji natychmiast po zakończeniu aktualnej
+wysłanie sygnału SIGTERM do demona:
+- podczas spania - zakończenie demona
+- podczas synchronizacji - zakończenie demona po zakończeniu synchronizacji, o ile podczas niej nie zostanie wysłany również SIGUSR1
+*/
+int main(int argc, char **argv)
+{
+    char *source, *destination;
+    unsigned int interval;
+    char recursive;
+    // Analizujemy (parsujemy) parametry podane przy uruchomieniu programu. Jeżeli wystąpił błąd
+    if (parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0)
+    {
+        // Wypisujemy prawidłowy sposób użycia programu.
+        printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
+        // Kończymy proces rodzicielski.
+        return -1;
+    }
+    // Sprawdzamy, czy katalog źródłowy jest prawidłowy. Jeżeli jest nieprawidłowy
+    if (directoryValid(source) < 0)
+    {
+        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        perror(source);
+        // Kończymy proces rodzicielski.
+        return -2;
+    }
+    // Sprawdzamy, czy katalog docelowy jest prawidłowy. Jeżeli jest nieprawidłowy
+    if (directoryValid(destination) < 0)
+    {
+        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        perror(destination);
+        // Kończymy proces rodzicielski.
+        return -3;
+    }
+
+    // Uruchamiamy demona.
+    runDaemon(source, destination, interval, recursive);
+
+    return 0;
+}
+
 struct element
 {
     // Następny element listy.
