@@ -655,7 +655,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
         stringAppend(dstFilePath, length++, "/"); // dopisujemy '/' do ścieżki usuwanego katalogu
         status = removeDirectoryRecursively(dstFilePath, length);
         syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstFilePath, status);
-        ret = 7;
+        if(status != 0) ret = 7;
         curD = curD->next;
     }
     while(curS != NULL) // kopiujemy pozostałe katalogi z katalogu źródłowego, począwszy od aktualnie wskazywanego przez curS
