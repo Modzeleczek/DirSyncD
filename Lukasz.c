@@ -31,7 +31,7 @@ struct element
 };
 int cmp(element *a, element *b)
 {
-    return strcmp(a->entry->d_name, b->entry->d_name); // funkcja porównująca elementy; porządek leksykograficzny
+    return strcmp(a->entry->d_name, b->entry->d_name); // funkcja porównująca elementy przechowujące struct dirent; porządek leksykograficzny
 }
 
 struct list
@@ -422,7 +422,7 @@ int listFilesAndDirectories(DIR *dir, list *files, list *dirs)
 // jeżeli inode (i-węzeł, czyli fizyczny plik w pamięci masowej) ma w katalogu źródłowym więcej niż 1 nazwę, to w katalogu docelowym każda nazwa jest kopiowana jako oddzielny inode
 int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst/*, const unsigned long long threshold*/)
 {
-    // ściezka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
+    // ścieżka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
     char *srcFilePath = NULL, *dstFilePath = NULL;
     if((srcFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu źródłowego
         return -1;
@@ -512,12 +512,12 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                         status = 0;
                     syslog(LOG_INFO, "przepisujemy uprawnienia pliku %s do %s; %i\n", srcFilePath, dstFilePath, status);
                 }
-                curS = curS->next; // przesuwamy wskaźniki elementów na listach, bo niżej nie będą już potrzebne
+                curS = curS->next; // przesuwamy wskaźniki elementów na listach
                 curD = curD->next;
             }
         }
     }
-    while(curD != NULL) // jeżeli w powyższej pętli nie wystąpił błąd; usuwamy pozostałe pliki z katalogu docelowego, począwszy od aktualnie wskazywanego przez curD, ponieważ nie istnieją one w katalogu źródłowym
+    while(curD != NULL) // usuwamy pozostałe pliki z katalogu docelowego, począwszy od aktualnie wskazywanego przez curD, ponieważ nie istnieją one w katalogu źródłowym
     {
         char *dstFileName = curD->entry->d_name;
         stringAppend(dstFilePath, dstDirPathLength, dstFileName); // dopisujemy nazwę pliku docelowego do ścieżki katalogu docelowego
@@ -556,7 +556,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
 // wszędzie w nazwach zmiennych wyraz "file" jest użyty w znaczeniu "katalog", bo nie chce mi się zmieniać, a katalog to też plik
 int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst, char *isReady)
 {
-    // ściezka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
+    // ścieżka w systemie plików ext4 może mieć maksymalnie PATH_MAX (4096) bajtów
     char *srcFilePath = NULL, *dstFilePath = NULL;
     if((srcFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL) // rezerwujemy PATH_MAX bajtów na ścieżkę do aktualnego pliku z katalogu źródłowego
         return -1;
@@ -876,7 +876,7 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
         }
     }
     int remainingArguments = argc - optind; // wyznaczamy liczbę argumentów, które nie są opcjami
-    if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ściezki źródłowej i docelowej), to kończymy
+    if(remainingArguments != 2) // jeżeli nie mamy dokładnie dwóch argumentów (ścieżki źródłowej i docelowej), to kończymy
         return -7;
     // optind - indeks pierwszego argumentu niesparsowanego przez getopt
     *source = argv[optind];
