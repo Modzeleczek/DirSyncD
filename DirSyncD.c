@@ -1,4 +1,4 @@
-#include "Lukasz.h"
+#include "DirSyncD.h"
 
 #include <unistd.h>
 #include <sys/types.h>
