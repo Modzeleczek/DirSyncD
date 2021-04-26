@@ -1035,7 +1035,7 @@ void startDaemon(char *source, char *destination, unsigned int interval, char re
     if(destinationPath != NULL)
         free(destinationPath);
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
-    syslog(LOG_INFO, "zakonczenie %i", ret);
+    syslog(LOG_INFO, "zakonczenie; %i", ret);
     closelog();
     exit(ret); // zamykamy proces demona
 }
