@@ -1,12 +1,14 @@
-all: build/DirSyncD
+MAKEFLAGS += --no-builtin-rules # Disable implicit rules execution.
+BUILD = ./build
 
-build/DirSyncD: build/DirSyncD.o
-	cd build; \
-	gcc -o DirSyncD DirSyncD.o
+all: DirSyncD
 
-build/DirSyncD.o: DirSyncD.c
-	gcc -c DirSyncD.c -o build/DirSyncD.o
+DirSyncD: $(BUILD)/DirSyncD
+$(BUILD)/DirSyncD: $(BUILD)/DirSyncD.o
+	gcc $^ -o $@
+$(BUILD)/DirSyncD.o: DirSyncD.c
+	@mkdir -p $(BUILD)
+	gcc $^ -c -o $@
 
 clean:
-	cd build; \
-	rm DirSyncD DirSyncD.o
+	@rm -rvf $(BUILD)
