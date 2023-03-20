@@ -16,53 +16,57 @@
 #include <syslog.h>
 
 /*
-argumenty:
-sciezka_zrodlowa - ścieżka do katalogu, z którego kopiujemy
-sciezka_docelowa - ścieżka do katalogu, do którego kopiujemy
-dodatkowe opcje:
--i <czas_spania> - czas spania
--R - rekurencyjna synchronizacja katalogów
--t <prog_duzego_pliku> - minimalny rozmiar pliku, żeby był on potraktowany jako duży
-sposób użycia:
-DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa
-wysłanie sygnału SIGUSR1 do demona:
-- podczas spania - przedwczesne obudzenie
-- podczas synchronizacji - wymuszenie ponownej synchronizacji natychmiast po zakończeniu aktualnej
-wysłanie sygnału SIGTERM do demona:
-- podczas spania - zakończenie demona
-- podczas synchronizacji - zakończenie demona po zakończeniu synchronizacji, o ile podczas niej nie zostanie wysłany również SIGUSR1
+Essential arguments:
+- source_path - path of the directory from which we copy
+- target_path - path of the directory to which we copy
+
+Additional options:
+- -i <sleep_time> - sleep time
+- -R - recursive directory synchronization
+- -t <big_file_threshold> - minimal file size to consider it big
+
+Usage:
+DirSyncD [-i <sleep_time>] [-R] [-t <big_file_threshold>] source_path target_path
+
+Send signal SIGUSR1 to the daemon:
+- during sleep - to prematurely wake it up.
+- during synchronization - to force it to repeat the synchronization immediately after finishing the current one.
+
+Send signal SIGTERM to the daemon:
+- during sleep - to stop it.
+- during synchronization - to force it to stop after finishing the current synchronization unless the daemon receives SIGUSR1 during it.
 */
 int main(int argc, char **argv)
 {
     char *source, *destination;
     unsigned int interval;
     char recursive;
-    // Analizujemy (parsujemy) parametry podane przy uruchomieniu programu. Jeżeli wystąpił błąd
+    // Analyze (parse) parameters passed on program start. If an error occured
     if (parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0)
     {
-        // Wypisujemy prawidłowy sposób użycia programu.
+        // Print the correct way of using the program.
         printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
-        // Kończymy proces rodzicielski.
+        // Stop the parent process.
         return -1;
     }
-    // Sprawdzamy, czy katalog źródłowy jest prawidłowy. Jeżeli jest nieprawidłowy
+    // Check if the source directory is valid. If it is invalid
     if (directoryValid(source) < 0)
     {
-        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        // Print the error message for error code stored in errno variable. 
         perror(source);
-        // Kończymy proces rodzicielski.
+        // Stop the parent process.
         return -2;
     }
-    // Sprawdzamy, czy katalog docelowy jest prawidłowy. Jeżeli jest nieprawidłowy
+    // Check if the target directory is valid. If it is invalid
     if (directoryValid(destination) < 0)
     {
-        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        // Print the error message for error code stored in errno variable. 
         perror(destination);
-        // Kończymy proces rodzicielski.
+        // Stop the parent process.
         return -3;
     }
 
-    // Uruchamiamy demona.
+    // Start the daemon.
     runDaemon(source, destination, interval, recursive);
 
     return 0;
@@ -70,77 +74,77 @@ int main(int argc, char **argv)
 
 struct element
 {
-    // Następny element listy.
+    // Next list node.
     element *next;
-    // Wskaźnik na element katalogu (plik lub podkatalog).
+    // Pointer to a directory entry (file or subdirectory).
     struct dirent *entry;
 };
 int cmp(element *a, element *b)
 {
-    // Funkcja porównująca elementy listy (porządek leksykograficzny).
+    // Function comparing list nodes (lexicographic order).
     return strcmp(a->entry->d_name, b->entry->d_name);
 }
 
 struct list
 {
-    // Pierwszy i ostatni element. Zapisujemy wskaźnik na ostatni element, aby w czasie stałym dodawać elementy do listy.
+    // The first and last nodes. Save a pointer to the last node to add new nodes to the list in constant time.
     element *first, *last;
-    // Liczba elementów listy.
+    // Number of list nodes.
     unsigned int count;
 };
 void initialize(list *l)
 {
-    // Ustawiamy wskaźniki do pierwszego i ostatnego elementu na NULL.
+    // Set pointers to the first and last nodes to NULL.
     l->first = l->last = NULL;
-    // Zerujemy liczbę elementów.
+    // Set the number of nodes to 0.
     l->count = 0;
 }
 int pushBack(list *l, struct dirent *newEntry)
 {
     element *new = NULL;
-    // Rezerwujemy pamięć na nowy element listy. Jeżeli wystąpił błąd
+    // Reserve memory for a new list node. If an error occured
     if ((new = malloc(sizeof(element))) == NULL)
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -1;
-    // Zapisujemy w elemencie listy wskaźnik na element katalogu.
+    // Store the directory entry pointer in the list node 
     new->entry = newEntry;
-    // Ustawiamy na NULL wskaźnik na następny element listy.
+    // Set the pointer to the next list node to NULL.
     new->next = NULL;
-    // Jeżeli lista jest pusta, czyli first == NULL i last == NULL
+    // If the list is empty, thus first == NULL i last == NULL
     if (l->first == NULL)
     {
-        // Ustawiamy nowy element jako pierwszy
+        // Set the new node as the first one
         l->first = new;
-        // i ostatni.
+        // and the last one.
         l->last = new;
     }
-    // Jeżeli lista nie jest pusta
+    // If the list is not empty
     else
     {
-        // Ustawiamy nowy element jako następny po aktualnie ostatnim.
+        // Set the new node as the next after current last one.
         l->last->next = new;
-        // Przestawiamy aktualnie ostatni na nowy element.
+        // Move the last node pointer to the newly added node.
         l->last = new;
     }
-    // Zwiększamy liczbę elementów.
+    // Increment the number of nodes.
     ++l->count;
-    // Zwracamy kod poprawnego zakończenia.
+    // Return the correct ending code.
     return 0;
 }
 void clear(list *l)
 {
-    // Zapisujemy wskaźnik na pierwszy element listy.
+    // Save the pointer to the first node.
     element *cur = l->first, *next;
     while (cur != NULL)
     {
-        // Zapisujemy wskaźnik na następny element.
+        // Save the pointer to the next node.
         next = cur->next;
-        // Zwalniamy pamięć elementu.
+        // Release the node's memory.
         free(cur);
-        // Przesuwamy wskaźnik na następny element.
+        // Move the pointer to the next node.
         cur = next;
     }
-    // Zerujemy pola listy.
+    // Zero out the list's fields.
     initialize(l);
 }
 void listMergeSort(list *l)
@@ -230,1376 +234,1377 @@ void listMergeSort(list *l)
     }
 }
 
-// static - zmienna globalna widoczna tylko w tym pliku od momentu deklaracji w dół
-// Poziom dużego pliku. Jeżeli rozmiar pliku jest mniejszy od threshold, to plik podczas kopiowania jest traktowany jako mały, w przeciwnym razie jako duży.
+// static - global variable visible only in the current file below its declaration
+// Big file threshold. If the file size is lesser than threshold, then during copying the file is considered small, otherwise big.
 static unsigned long long threshold;
-// Rozmiar bufora do kopiowania pliku.
+// Size of the buffer used to copy files.
 #define BUFFERSIZE 4096
 
 void stringAppend(char *dst, const size_t offset, const char *src)
 {
-    // Przesuwamy się o offset bajtów względem początku napisu dst. Począwszy od obliczonej pozycji wstawiamy napis src.
+    // Move offset bytes from the beginning of string dst.  Starting at the calculated position, insert string src.
     strcpy(dst + offset, src);
-    // Można użyć strcat, ale on dopisuje src na końcu dst i prawdopodobnie oblicza długość dst strlenem, marnując czas.
+    // Strcat can be used but it appends src at the end of dst and presumably wastes time calculating the length of dst using strlen.
 }
 size_t appendSubdirectoryName(char *path, const size_t pathLength, const char *subName)
 {
-    // Dopisujemy nazwę podkatalogu do ścieżki katalogu źródłowego.
+    // Append the subdirectory name to source directory path.
     stringAppend(path, pathLength, subName);
-    // Wyznaczamy długość ścieżki podkatalogu jako sumę długości ścieżki katalogu źródłowego i nazwy podkatalogu.
+    // Calculate the length of subdirectory path as sum of source directory path length and subdirectory name length.
     size_t subPathLength = pathLength + strlen(subName);
-    // Dopisujemy '/' do utworzonej ścieżki podkatalogu.
+    // Append '/' to the created subdirectory path.
     stringAppend(path, subPathLength, "/");
-    // Zwiększamy długość ścieżki podkatalogu o 1, bo dopisaliśmy '/'.
+    // Increment subdirectory path length by 1 because '/' was appended.
     subPathLength += 1;
-    // Zwracamy długość utworzonej ścieżki podkatalogu.
+    // Return created subdirectory path length.
     return subPathLength;
 }
 
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive)
 {
-    // Jeżeli nie podano żadnych parametrów
+    // If no parameters were passed
     if (argc <= 1)
-        // Zwracamy kod błędu.
+        // Return error code.
         return -1;
-    // Zapisujemy domyślny czas spania w sekundach równy 5*60 s = 5 min.
+    // Save default sleep time equal to 5*60 s = 5 min.
     *interval = 5 * 60;
-    // Zapisujemy domyślny brak rekurencyjnej synchronizacji katalogów.
+    // Save default non-recursive directory synchronization.
     *recursive = 0;
-    // Zapisujemy domyślny próg dużego pliku równy maksymalnej wartości zmiennej typu unsigned long long int.
+    // Save default big file threshold equal to maximal possible value of unsigned long long int variable.
     threshold = ULLONG_MAX;
     int option;
-    // Umieszczamy ':' na początku __shortopts, aby móc rozróżniać między '?' (nieznaną opcją) i ':' (brakiem podania wartości dla opcji)
+    // Place ':' at the beginning of __shortopts to distinguish between '?' (unknown option) and ':' (no value given for an option).
     while ((option = getopt(argc, argv, ":Ri:t:")) != -1)
     {
         switch (option)
         {
         case 'R':
-            // Ustawiamy rekurencyjną synchronizację katalogów.
+            // Enable recursive directory synchronization.
             *recursive = (char)1;
             break;
         case 'i':
-            // Ciąg znaków optarg jest czasem spania w sekundach. Zamieniamy go na liczbę typu unsigned int. Jeżeli sscanf nie wypełnił poprawnie zmiennej interval, to podana wartość czasu ma niepoprawny format i
+            // String optarg is sleep time in seconds. Transform it into unsigned int. If sscanf did not correctly fill interval, the passed time value has invalid format and
             if (sscanf(optarg, "%u", interval) < 1)
-                // Zwracamy kod błędu.
+                // Return error code.
                 return -2;
             break;
         case 't':
-            // Ciąg znaków optarg jest progiem dużego pliku. Zamieniamy go na unsigned long long int. Jeżeli sscanf nie wypełnił poprawnie zmiennej THRESHOLD, to podana wartość rozmiaru pliku ma niepoprawny format i
+            // String optarg is big file threshold. Transform it into unsigned long long int. If sscanf did not correctly fill THRESHOLD, the passed file size value has invalid format and
             if (sscanf(optarg, "%llu", &threshold) < 1)
-                // Zwracamy kod błędu.
+                // Return error code.
                 return -3;
             break;
         case ':':
-            // Jeżeli podano opcję -i lub -t, ale nie podano jej wartości, to wypisujemy komunikat
+            // If option -i or -t was passed without its value, print message
             printf("opcja wymaga podania wartosci\n");
-            // Zwracamy kod błędu.
+            // Return error code.
             return -4;
             break;
         case '?':
-            // Jeżeli podano opcję inną niż -R, -i, -t
+            // If option other than -R, -i, -t was specified
             printf("nieznana opcja: %c\n", optopt);
-            // Zwracamy kod błędu.
+            // Return error code.
             return -5;
             break;
         default:
-            // Jeżeli getopt zwróciło wartość inną niż powyższe, co nie powinno się nigdy zdarzyć
+            // If getopt returned a value other than listed above (it should never happen)
             printf("blad");
-            // Zwracamy kod błędu.
+            // Return error code.
             return -6;
             break;
         }
     }
-    // Wyznaczamy liczbę argumentów, które nie są opcjami (powinny być dokładnie 2: ścieżka źródłowa i docelowa).
+    // Count the arguments not being options (should be exactly 2: source and target paths).
     int remainingArguments = argc - optind;
-    if (remainingArguments != 2) // Jeżeli nie mamy dokładnie dwóch argumentów
-        // zwracamy kod błędu.
+    if (remainingArguments != 2) // If there are not exactly 2 arguments
+        // Return error code.
         return -7;
-    // optind jest indeksem pierwszego argumentu niebędącego opcją sparsowaną przez getopt, czyli ścieżki źródłowej. Zapisujemy ścieżkę źródłową.
+    // Optind is index of the first argument not being an option parsed by getopt. Therefore, optind should be index of source path argument. Save the source path.
     *source = argv[optind];
-    // Zapisujemy ścieżkę docelową.
+    // Save the target path.
     *destination = argv[optind + 1];
-    // Zwracamy kod poprawnego zakończenia.
+    // Return the correct ending code.
     return 0;
 }
 
 int directoryValid(const char *path)
 {
-    // Otwieramy katalog.
+    // Open the directory.
     DIR *d = opendir(path);
-    // Jeżeli wystąpił błąd (m. in. kiedy katalog nie istnieje)
+    // If an error occured (e.g. when the directory does not exist)
     if (d == NULL)
-        // Zwracamy kod błędu.
+        // Return error code.
         return -1;
-    // Zamykamy katalog. Jeżeli wystąpił błąd
+    // Close the directory. If an error occured
     if (closedir(d) == -1)
-        // Zwracamy kod błędu.
+        // Return error code.
         return -2;
-    // Zwracamy kod poprawnego zakończenia, oznaczający, że katalog istnieje i operacje na nim nie powodują błędów.
+    // Return the correct ending code meaning that the directory exists and operating on it does not cause errors.
     return 0;
 }
 
-// Flaga wymuszonej synchronizacji ustawiana w funkcji obsługi sygnału SIGUSR1.
+// Flag of forced synchronization set in SIGUSR1 signal handler function.
 char forcedSynchronization;
-// Funkcja obsługi sygnału SIGUSR1.
+// SIGUSR1 signal handler function.
 void sigusr1Handler(int signo)
 {
-    // Ustawiamy flagę wymuszonej synchronizacji.
+    // Set the flag of forced synchronization.
     forcedSynchronization = 1;
 }
 
-// Flaga zakończenia ustawiana w funkcji obsługi sygnału SIGTERM.
+// Flag of stopping set in SIGTERM signal handler function.
 char stop;
-// Funkcja obsługi sygnału SIGTERM.
+// SIGTERM signal handler function.
 void sigtermHandler(int signo)
 {
-    // Ustawiamy flagę zakończenia.
+    // Set the flag of stopping.
     stop = 1;
 }
 
 void runDaemon(char *source, char *destination, unsigned int interval, char recursive)
 {
-    // Tworzymy proces potomny.
+    // Create a child process.
     pid_t pid = fork();
-    // Jeżeli wystąpił błąd podczas wywołania fork jeszcze w procesie rodzicielskim, czyli nie powstał proces potomny.
+    // If an error occured during fork execution still in the parent process, so no child process was created.
     if (pid == -1)
     {
-        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        // Print the error message for error code stored in errno variable. 
         perror("fork");
-        // Zamykamy proces rodzicielski ze statusem oznaczającym błąd.
+        // Stop the parent process with an error status code.
         exit(-1);
     }
-    // W procesie rozdzicielskim zmienna pid ma wartość równą PID utworzonego procesu potomnego.
+    // In the parent process, pid variable has value equal to PID of the created child process.
     else if (pid > 0)
     {
-        // Będąc wciąż w procesie rodzicielskim, wypisujemy PID procesu potomnego.
+        // Being still in the parent process, print child process' PID.
         printf("PID procesu potomnego: %i\n", pid);
-        // Zamykamy proces rodzicielski ze statusem oznaczającym brak błędów.
+        // Stop the parent process with a status code indicating no errors.
         exit(0);
     }
-    // Poniższy kod wykonuje się w procesie potomnym, bo w nim pid == 0. Przekształcamy proces potomny w demona (Love R. - "Linux. Programowanie systemowe." str. 177). Wstępnie ustawiamy status oznaczający brak błędu.
+    // The code below is executed in the child process because pid == 0 in it. Transform the child process into a daemon (Robert Love - "Linux System Programming", page 177, at least in Polish version of the book). Initially, set status code indicating no error.
     int ret = 0;
     char *sourcePath = NULL, *destinationPath = NULL;
-    // W systemie plików ext4 ścieżka bezwzględna może mieć maksymalnie PATH_MAX (4096) bajtów. Rezerwujemy PATH_MAX bajtów na ścieżkę katalogu źródłowego. Jeżeli wystąpił błąd
+    // In ext4 file system, an absolute path can be at most PATH_MAX (4096) bytes long. Reserve PATH_MAX bytes for the source directory path. If an error occured
     if ((sourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-        // Ustawiamy status oznaczający błąd. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set status code indicating an error. After that, the program immediately goes to the end of the current function.
         ret = -1;
-    // Rezerwujemy PATH_MAX bajtów na ścieżkę katalogu docelowego. Jeżeli wystąpił błąd
+    // Reserve PATH_MAX bytes for the target directory path. If an error occured
     else if ((destinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -2;
-    // Wyznaczamy ścieżkę bezwzględną katalogu źródłowego. Jeżeli wystąpił błąd
+    // Create the absolute source directory path. If an error occured
     else if (realpath(source, sourcePath) == NULL)
     {
-        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno. Wciąż możemy to zrobić, bo jeszcze nie przeadresowaliśmy deskryptorów procesu potomnego.
+        // Print the error message for error code stored in errno variable. It is still possible because we have not readdressed child process' descriptors and we can access stdout.
         perror("realpath; source");
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -3;
     }
-    // Wyznaczamy ścieżkę bezwzględną katalogu docelowego. Jeżeli wystąpił błąd
+    // Create the absolute target directory path. If an error occured
     else if (realpath(destination, destinationPath) == NULL)
     {
-        // Wypisujemy błąd o kodzie umieszczonym w zmiennej errno.
+        // Print the error message for error code stored in errno variable.
         perror("realpath; destination");
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -4;
     }
-    // Tworzymy nową sesję i grupę procesów. Jeżeli wystąpił błąd
+    // Create a new session and process group. If an error occured
     else if (setsid() == -1)
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -5;
-    // Ustawiamy katalog roboczy procesu na "/". Jeżeli wystąpił błąd
+    // Set process' current working directory to "/". If an error occured
     else if (chdir("/") == -1)
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -6;
     else
     {
         int i;
-        // Obowiązkowo zamykamy stdin, stdout, stderr (deskryptory 0, 1, 2)
+        // Essentially close stdin, stdout, stderr (descriptors: 0, 1, 2).
         for (i = 0; i <= 2; ++i)
-            // Jeżeli wystąpił błąd
+            // If an error occured
             if (close(i) == -1)
             {
-                // Ustawiamy status oznaczający błąd.
+                // Set status code indicating an error.
                 ret = -(50 + i);
                 break;
             }
     }
-    // Jeżeli jeszcze nie wystąpił żaden błąd
+    // If no error has occured yet
     if (ret >= 0)
     {
         int i;
-        // Jeżeli są otwarte, to zamykamy dalsze deskryptory (od 3 do 1023), bo domyślnie w Linuxie proces może mieć otwarte maksymalnie 1024 deskryptory.
+        // If greater descriptors (from 3 to 1023) are open, then close them because in Linux a process can have max 1024 open descriptors.
         for (i = 3; i <= 1023; ++i)
-            // Zamykamy deskryptor i. Jeżeli wystąpił błąd, to go ignorujemy.
+            // Close i-th descriptor. If an error occured, ignore it.
             close(i);
         sigset_t set;
-        // Przeadresowujemy deskryptory 0, 1, 2 na "/dev/null". Ustawiamy deskryptor 0 (stdin, czyli najmniejszy zamknięty) na "/dev/null". Jeżeli wystąpił błąd
+        // Readdress descriptors 0, 1, 2 to '/dev/null'. Set descriptor 0 (stdin, the least from the closed descriptors) to '/dev/null'. If an error occured
         if (open("/dev/null", O_RDWR) == -1)
-            // Już nie wywołujemy perror, bo w procesie potomnym nie możemy już wypisać błędu do terminala uruchamiającego proces rodzicielski. Ustawiamy status oznaczający błąd.
+            // Do not call perror anymore because the child process cannot print an error to the terminal which started the parent process. Set status code indicating an error.
             ret = -8;
-        // Ustawiamy deskryptor 1 (stdout) na to samo co deskryptor 0 - na "/dev/null". Jeżeli wystąpił błąd
+        // Set descriptor 1 (stdout) to the same as descriptor 0 ('/dev/null'). If an error occured
         else if (dup(0) == -1)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -9;
-        // Ustawiamy deskryptor 2 (stderr) na to samo co deskryptor 0 - na "/dev/null". Jeżeli wystąpił błąd
+        // Set descriptor 2 (stderr) to the same as descriptor 0 ('/dev/null'). If an error occured
         else if (dup(0) == -1)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -10;
-        // W tym momencie proces potomny jest już demonem. Rejestrujemy funkcję obsługującą sygnał SIGUSR1. Jeżeli wystąpił błąd
+        // Here, the child process is already a daemon. Register SIGUSR1 signal handler function. If an error occured
         else if (signal(SIGUSR1, sigusr1Handler) == SIG_ERR)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -11;
-        // Rejestrujemy funkcję obsługującą sygnał SIGTERM. Jeżeli wystąpił błąd
+        // Register SIGTERM signal handler function. If an error occured
         else if (signal(SIGTERM, sigtermHandler) == SIG_ERR)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -12;
-        // Inicjujemy zbiór sygnałów jako pusty. Jeżeli wystąpił błąd
+        // Initialize an empty signal set. If an error occured
         else if (sigemptyset(&set) == -1)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -13;
-        // Dodajemy SIGUSR1 do zbioru sygnałów. Jeżeli wystąpił błąd
+        // Add SIGUSR1 to the signal set. If an error occured
         else if (sigaddset(&set, SIGUSR1) == -1)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -14;
-        // Dodajemy SIGTERM do zbioru sygnałów. Jeżeli wystąpił błąd
+        // Add SIGTERM to the signal set. If an error occured
         else if (sigaddset(&set, SIGTERM) == -1)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -15;
         else
         {
-            // Wyznaczamy długość ścieżki bezwzględnej katalogu źródłowego.
+            // Calculate source directory absolute path length.
             size_t sourcePathLength = strlen(sourcePath);
-            // Jeżeli bezpośrednio przed '\0' (null terminatorem) nie ma '/'
+            // If there is no '/' immediately before '\0' (null terminator)
             if (sourcePath[sourcePathLength - 1] != '/')
-                // Wstawiamy '/' na miejscu '\0'. Zwiększamy długość ścieżki o 1. Wstawiamy '\0' po '/'.
+                // Insert '/' in place of '\0'. Increment path length by 1. Insert'\0' after '/'.
                 stringAppend(sourcePath, sourcePathLength++, "/");
-            // Wyznaczamy długość ścieżki bezwzględnej katalogu docelowego.
+            // Calculate target directory absolute path length.
             size_t destinationPathLength = strlen(destinationPath);
-            // Jeżeli bezpośrednio przed '\0' nie ma '/'
+            // If there is no '/' immediately before'\0'
             if (destinationPath[destinationPathLength - 1] != '/')
-                // Wstawiamy '/' na miejscu '\0'. Zwiększamy długość ścieżki o 1. Wstawiamy '\0' po '/'.
+                // Insert '/' in place of '\0'. Increment path length by 1. Insert '\0' after '/'.
                 stringAppend(destinationPath, destinationPathLength++, "/");
             synchronizer synchronize;
-            // Jeżeli ustawiona jest synchronizacja nierekurencyjna
+            // If non-recursive synchronization is set
             if (recursive == 0)
-                // Zapisujemy wskaźnik do funkcji synchronizującej nierekurencyjnie.
+                // Save a pointer to function synchronizing non-recursively.
                 synchronize = synchronizeNonRecursively;
-            // Jeżeli ustawiona jest synchronizacja rekurencyjna
+            // If recursive synchronization is set
             else
-                // Zapisujemy wskaźnik do funkcji synchronizującej rekurencyjnie.
+                // Save a pointer to function synchronizing recursively.
                 synchronize = synchronizeRecursively;
-            // Wstępnie ustawiamy 0, bo zmienna służy do zakończenia demona (przerwania pętli) sygnałem SIGTERM.
+            // Initially, set to 0 because the variable is used to stop the daemon (break the loop) with signal SIGTERM.
             stop = 0;
-            // Wstępnie ustawiamy 0, bo zmienna służy do pomijania startu spania sygnałem SIGUSR1.
+            // Initially, set to 0 because the variable is used to skip the sleep start with signal SIGUSR1.
             forcedSynchronization = 0;
             while (1)
             {
-                // Jeżeli nie wymuszono synchronizacji sygnałem SIGUSR1
+                // If any synchronization was not forced with signal SIGUSR1
                 if (forcedSynchronization == 0)
                 {
-                    // Otwieramy połączenie z logiem ("/var/log/syslog").
+                    // Open connection to log ('/var/log/syslog').
                     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
-                    // Zapisujemy do logu informację o uśpieniu.
+                    // In the log, write a message about sleep start.
                     syslog(LOG_INFO, "uspienie");
-                    // Zamykamy połączenie z logiem.
+                    // Close the connection to the log.
                     closelog();
-                    // Usypiamy demona.
+                    // Put the daemon to sleep.
                     unsigned int timeLeft = sleep(interval);
-                    // Otwieramy połączenie z logiem.
+                    // Open the connection to the log.
                     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
-                    // Zapisujemy do logu informację o obudzeniu z liczbą przespanych sekund.
+                    // In the log, write a message about waking up with sleep time in seconds.
                     syslog(LOG_INFO, "obudzenie; przespano %u s", interval - timeLeft);
-                    // Zamykamy połączenie z logiem.
+                    // Close the connection to the log.
                     closelog();
-                    // Jeżeli spanie zostało przerwane odebraniem SIGTERM
+                    // If sleep was interrupted by receiving SIGTERM
                     if (stop == 1)
-                        // Przerywamy pętlę.
+                        // Break the loop.
                         break;
                 }
-                // Włączamy blokowanie sygnałów ze zbioru, czyli SIGUSR1 i SIGTERM. Jeżeli wystąpił błąd
+                // Start blocking signals from the set (SIGUSR1 and SIGTERM). If an error occured
                 if (sigprocmask(SIG_BLOCK, &set, NULL) == -1)
                 {
-                    // Ustawiamy status oznaczający błąd.
+                    // Set status code indicating an error.
                     ret = -16;
-                    // Przerywamy pętlę.
+                    // Break the loop.
                     break;
                 }
-                // Rozpoczynamy synchronizację wybraną funkcją. Pomijamy błędy, ale zapisujemy do logu status. 0 oznacza, że cała synchronizacja przebiegła bez błędów. Wartość różna od 0 oznacza, że katalogi mogą nie być zsynchronizowane.
+                // Start synchronizing with the selected function. Ignore errors but write the status code to the log. 0 means that the entire synchronization went without errors. Value different from 0 means that directories may be not fully synchronized.
                 int status = synchronize(sourcePath, sourcePathLength, destinationPath, destinationPathLength);
-                // Otwieramy połączenie z logiem.
+                // Open the connection to the log.
                 openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
-                // Zapisujemy do logu informację o zakończeniu synchronizacji ze statusem.
+                // In the log, write a message about finishing the synchronization with status code.
                 syslog(LOG_INFO, "koniec synchronizacji; %i", status);
-                // Zamykamy połączenie z logiem.
+                // Close the connection to the log.
                 closelog();
-                // Niezależnie, czy synchronizacja była wymuszona, czy samoczynna po przespaniu całego czasu, ustawiamy 0 po jej zakończeniu.
+                // Regardless of whether the synchronization was forced or automatic (after sleeping for the entire sleep time), set 0 after its finish.
                 forcedSynchronization = 0;
-                // Wyłączamy blokowanie sygnałów ze zbioru, czyli SIGUSR1 i SIGTERM. Jeżeli wystąpił błąd
+                // Stop blocking signals from the set (SIGUSR1 and SIGTERM). If an error occured
                 if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
                 {
-                    // Ustawiamy status oznaczający błąd.
+                    // Set status code indicating an error.
                     ret = -17;
-                    // Przerywamy pętlę.
+                    // Break the loop.
                     break;
                 }
-                // Jeżeli podczas synchronizacji odebraliśmy SIGUSR1 lub SIGTERM, to po wyłączeniu ich blokowania zostaną wykonane funkcje ich obsługi.
-                // Jeżeli podczas synchronizacji odebraliśmy SIGUSR1, to po jej zakończeniu od razu zostanie wykonana kolejna synchronizacja.
-                // Jeżeli podczas synchronizacji nie odebraliśmy SIGUSR1 i odebraliśmy SIGTERM, to po jej zakończeniu demon się zakończy.
-                // Jeżeli podczas synchronizacji odebraliśmy SIGUSR1 i SIGTERM, to po jej zakończeniu najpierw zostanie wykonana kolejna synchronizacja, a jeżeli podczas niej nie odbierzemy SIGUSR1, to po niej demon się zakończy. Jeżeli jednak podczas tej drugiej synchronizacji odbierzemy SIGUSR1, to zostanie wykonana trzecia synchronizacja, itd.. Po zakończeniu pierwszej synchronizacji, podczas której nie odbierzemy SIGUSR1, demon się zakończy
-                // Jeżeli nie wymuszono kolejnej synchronizacji i wymuszono zakończenie
+                // If during the synchronization SIGUSR1 or SIGTERM was received, then after stopping blocking them, their handler functions are executed.
+                // If during the synchronization SIGUSR1 was received, then immediately after its finish, a next synchronization is performed.
+                // If during the synchronization SIGUSR1 was not received but SIGTERM was, then after its finish, the daemon stops.
+                // If during the synchronization SIGUSR1 and SIGTERM were received, then after its finish, a next synchronization is performed. If during it SIGUSR1 is not received, then after its finish, the daemon stops. Otherwise a third synchronization is performed, etc. After finishing the first synchronization in the series during which SIGUSR1 is not received, the daemon stops.
+                // If no next synchronization was forced but stopping was
                 if (forcedSynchronization == 0 && stop == 1)
-                    // Przerywamy pętlę.
+                    // Break the loop.
                     break;
             }
         }
     }
-    // Jeżeli w którymś momencie wystąpił błąd, to przechodzimy do tego miejsca.
-    // Jeżeli pamięć na ścieżkę katalogu źródłowego została zarezerwowana
+    // If an error occured somewhere, go here.
+    // If memory for source directory path was reserved
     if (sourcePath != NULL)
-        // Zwalniamy pamięć.
+        // Release memory.
         free(sourcePath);
-    // Jeżeli pamięć na ścieżkę katalogu docelowego została zarezerwowana
+    // If memory for target directory path was reserved
     if (destinationPath != NULL)
-        // Zwalniamy pamięć.
+        // Release memory.
         free(destinationPath);
-    // Otwieramy połączenie z logiem.
+    // Open connection to the log.
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
-    // Zapisujemy do logu informację o zakończeniu demona ze statusem.
+    // In the log, write a message about daemon stop with status code.
     syslog(LOG_INFO, "zakonczenie; %i", ret);
-    // Zamykamy połączenie z logiem.
+    // Close the connection to the log.
     closelog();
-    // Kończymy proces demona.
+    // Stop the daemon process.
     exit(ret);
 }
 
 int listFiles(DIR *dir, list *files)
 {
     struct dirent *entry;
-    // Wstępnie ustawiamy errno na 0.
+    // Initially, set errno to 0.
     errno = 0;
-    // Odczytujemy element katalogu. Jeżeli nie wystąpił błąd
+    // Read a directory entry. If no error occured
     while ((entry = readdir(dir)) != NULL)
     {
-        // Jeżeli element jest zwykłym plikiem (regular file), to dodajemy go do listy plików. Jeżeli wystąpił błąd
+        // If the entry is a regular file, add it to the file list. If an error occured
         if (entry->d_type == DT_REG && pushBack(files, entry) < 0)
-            // Przerywamy, zwracając kod błędu, bo listy elementów muszą być kompletne do porównywania katalogów podczas synchronizacji.
+            // Interrupt returning an error code because directory entry lists must be complete for directory comparison during a synchronization.
             return -1;
     }
-    // Jeżeli wystąpił błąd podczas odczytywania elementu, to readdir zwrócił NULL i ustawił errno na wartość różną od 0.
+    // If an error occured while reading a directory entry, then readdir returned NULL and set errno to a value not equal to 0.
     if (errno != 0)
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -2;
-    // Zwracamy kod poprawnego zakończenia.
+    // Return the correct ending code.
     return 0;
 }
 int listFilesAndDirectories(DIR *dir, list *files, list *subdirs)
 {
     struct dirent *entry;
-    // Wstępnie ustawiamy errno na 0.
+    // Initially, set errno to 0.
     errno = 0;
-    // Odczytujemy element katalogu. Jeżeli nie wystąpił błąd
+    // Read a directory entry. If no error occured
     while ((entry = readdir(dir)) != NULL)
     {
-        // Jeżeli element jest zwykłym plikiem (regular file)
+        // If the entry is a regular file
         if (entry->d_type == DT_REG)
         {
-            // Dodajemy go do listy plików. Jeżeli wystąpił błąd
+            // Add it to the file list. If an error occured
             if (pushBack(files, entry) < 0)
-                // Przerywamy, zwracając kod błędu, bo listy elementów muszą być kompletne do porównywania katalogów podczas synchronizacji.
+                 // Interrupt returning an error code because directory entry lists must be complete for directory comparison during a synchronization.
                 return -1;
         }
-        // Jeżeli element jest katalogiem (directory)
+        // If the entry is a directory
         else if (entry->d_type == DT_DIR)
         {
-            // Jeżeli ma nazwę różną od "." i ".."
+            // If its name is other than '.' and '..'
             if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 &&
-                // Dodajemy go do listy katalogów. Jeżeli wystąpił błąd
+                // Add it to the directory list. If an error occured
                 pushBack(subdirs, entry) < 0)
-                // Zwracamy kod błędu.
+                // Return an error code.
                 return -2;
         }
-        // Ignorujemy elementy o innych typach (symlinki; urządzenia blokowe, tekstowe; sockety; itp.).
+        // Ignore entries of other types (symbolic links, block devices, character devices, sockets, etc.).
     }
-    // Jeżeli wystąpił błąd podczas odczytywania elementu, to readdir zwrócił NULL i ustawił errno na wartość różną od 0.
+    // if an error occured while reading a directory entry, then readdir returned NULL and set errno to a value not equal to 0.
     if (errno != 0)
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -3;
-    // Zwracamy kod poprawnego zakończenia.
+    // Return the correct ending code.
     return 0;
 }
 
 int createEmptyDirectory(const char *path, mode_t mode)
 {
-    // Tworzymy pusty katalog i zwracamy status.
+    // Create an empty directory and return a status code.
     return mkdir(path, mode);
 }
 int removeDirectoryRecursively(const char *path, const size_t pathLength)
 {
-    // Wstępnie zapisujemy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int ret = 0;
     DIR *dir = NULL;
-    // Otwieramy katalog źródłowy. Jeżeli wystąpił błąd
+    // Open the source directory. If an error occured
     if ((dir = opendir(path)) == NULL)
-        // Ustawiamy kod błędu. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set an error code. After that, ther program goes to the end of the current function.
         ret = -1;
     else
     {
-        // Tworzymy listy na pliki i podkatalogi z katalogu.
+        // Create lists for files and subdirectories of the directory.
         list files, subdirs;
-        // Inicjujemy listę plików.
+        // Initialize the file list.
         initialize(&files);
-        // Inicjujemy listę podkatalogów.
+        // Initialize the subdirectory list.
         initialize(&subdirs);
-        // Wypełniamy listy plików i podkatalogów. Jeżeli wystąpił błąd
+        // Fill the list. If an error occured
         if (listFilesAndDirectories(dir, &files, &subdirs) < 0)
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = -2;
         else
         {
             char *subPath = NULL;
-            // Rezerwujemy pamięć na ścieżki podkatalogów i plików. Jeżeli wystąpił błąd
+            // Reserve memory for subdirectory and file paths. If an error occured
             if ((subPath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-                // Ustawiamy kod błędu.
+                // Set an error code.
                 ret = -3;
             else
             {
-                // Przepisujemy ścieżkę katalogu jako początek ścieżek jego plików i podkatalogów.
+                // Copy the directory path as the beginning of its file and subdirectory paths.
                 strcpy(subPath, path);
-                // Zapisujemy wskaźnik na pierwszy podkatalog.
+                // Save a pointer to the first subdirectory.
                 element *cur = subdirs.first;
-                // Rekurencyjnie usuwamy podkatalogi.
+                // Recursively remove subdirectories.
                 while (cur != NULL)
                 {
-                    // Dopisujemy nazwę podkatalogu do ścieżki jego katalogu. Funkcja removeDirectoryRecursively wymaga, aby ścieżka do katalogu była zakończona '/'.
+                    // Append the subdirectory name to its parent directory path. Function removeDirectoryRecursively demands that the directory path end with '/'.
                     size_t subPathLength = appendSubdirectoryName(subPath, pathLength, cur->entry->d_name);
-                    // Rekurencyjnie usuwamy podkatalogi. Jeżeli wystąpił błąd
+                    // Recursively remove subdirectories. If an error occured
                     if (removeDirectoryRecursively(subPath, subPathLength) < 0)
-                        // Ustawiamy kod błędu przeznaczony dla wyższego wywołania.
+                        // Set an error code intended for the calling function.
                         ret = -4;
-                    // Przesuwamy wskaźnik na następny podkatalog.
+                    // Move the pointer to the next subdirectory.
                     cur = cur->next;
                 }
-                // Zapisujemy wskaźnik na pierwszy plik.
+                // Save a pointer to the first file.
                 cur = files.first;
-                // Usuwamy pliki.
+                // Remove files.
                 while (cur != NULL)
                 {
-                    // Dopisujemy nazwę pliku do ścieżki jego katalogu.
+                    // Append the file name to its parent directory path.
                     stringAppend(subPath, pathLength, cur->entry->d_name);
-                    // Usuwamy plik. Jeżeli wystąpił błąd
+                    // Remove the file. If an error occured
                     if (removeFile(subPath) == -1)
-                        // Ustawiamy kod błędu.
+                        // Set an error code.
                         ret = -5;
-                    // Przesuwamy wskaźnik na następny plik.
+                    // Move the pointer to the next file.
                     cur = cur->next;
                 }
-                // Zwalniamy pamięć ścieżek plików i podkatalogów.
+                // Release memory intended for file and subdirectory paths.
                 free(subPath);
             }
         }
-        // Czyścimy listę plików.
+        // Clear file list.
         clear(&files);
-        // Czyścimy listę podkatalogów.
+        // Clear subdirectory list.
         clear(&subdirs);
     }
-    // Błąd krytyczny występuje, jeżeli nie uda się usunąć któregokolwiek elementu z katalogu.
-    // Jeżeli katalog został otwarty, to go zamykamy. Jeżeli wystąpił błąd i kod błędu jeszcze nie jest ujemny, czyli jeszcze nie wystąpił błąd krytyczny
+    // A critical error occurs if removing any directory entry is unsuccessful.
+    // If the directory was opened, close it. If an error occured and the error code is not negative yet, thus any critical error has not occured yet
     if (dir != NULL && closedir(dir) == -1 && ret >= 0)
-        // Ustawiamy dodatni kod błędu, czyli błąd niekrytyczny.
+        // Set a positive error code indicating a non-critical error.
         ret = 1;
-    // Jeżeli nie wystąpił żaden błąd krytyczny, to usuwamy katalog. Jeżeli wystąpił błąd
+    // If any critical error did not occur, delete the directory. If an error occured
     if (ret >= 0 && rmdir(path) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -6;
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 
 int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
 {
-    // Wstępnie zapisujemy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int ret = 0, in = -1, out = -1;
-    // Otwieramy plik źródłowy do odczytu i zapisujemy jego deskryptor. Jeżeli wystąpił błąd
+    // Open the source file for reading and save its descriptor. If an error occured
     if ((in = open(srcFilePath, O_RDONLY)) == -1)
-        // Ustawiamy kod błędu. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set an error code. After that, the program immediately goes to the end of the current function.
         ret = -1;
-    // Otwieramy plik docelowy do zapisu. Jeżeli nie istnieje, to go tworzymy, nadając puste uprawnienia, a jeżeli już istnieje, to go czyścimy. Zapisujemy jego deskryptor. Jeżeli wystąpił błąd
+    // Open the target file for writing. If it does not exist, create it with empty permissions. Otherwise, clear it. Save its descriptor. If an error occured
     else if ((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -2;
-    // Ustawiamy plikowi docelowemu uprawnienia dstMode. Jeżeli wystąpił błąd
+    // Set the target file dstMode permissions. If an error occured
     else if (fchmod(out, dstMode) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -3;
     else
     {
-        // (str. 124) Wysyłamy jądru wskazówkę (poradę), że plik źródłowy będzie odczytywany sekwencyjnie i dlatego należy go wczytywać z wyprzedzeniem.
+        // (page 124) Send an advice to the kernel that the source file will be read sequentially so it should be loaded in advance.
         if (posix_fadvise(in, 0, 0, POSIX_FADV_SEQUENTIAL) == -1)
-            // Ustawiamy kod błędu niekrytycznego, bo bez porady też można odczytywać plik źródłowy, ale mniej wydajnie.
+            // Set a non-critical error code because the source file can be read even without the advice but less effectively.
             ret = 1;
         char *buffer = NULL;
-        // Optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w jego metadanych pobranych za pomocą stat, ale używamy odgórnie ustalonego rozmiaru.
-        // Rezerwujemy pamięć bufora. Jeżeli wystąpił błąd
+        // Optimal buffer size for input/output operations on a file can be checked in its metadata read using stat but we use a predefined size.
+        // Reserve buffer memory. If an error occured
         if ((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL)
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = -4;
         else
         {
             while (1)
             {
-                // Poniższy algorytm jest na str. 45.
-                // Pozycja w buforze.
+                // The algorithm below is on page 45.
+                // Position in the buffer.
                 char *position = buffer;
-                // Zapisujemy całkowitą liczbę bajtów pozostałych do odczytania.
+                // Save the total number of bytes remaining to be read.
                 size_t remainingBytes = BUFFERSIZE;
                 ssize_t bytesRead;
-                // Dopóki liczby bajtów pozostałych do odczytania i bajtów odczytanych w aktualnej iteracji są niezerowe.
+                // While numbers of remaining bytes and bytes read in the current iteration are non-zero.
                 while (remainingBytes != 0 && (bytesRead = read(in, position, remainingBytes)) != 0)
                 {
-                    // Jeżeli wystąpił błąd w funkcji read.
+                    // If an error occured in function read.
                     if (bytesRead == -1)
                     {
-                        // Jeżeli funkcja read została przerwana odebraniem sygnału. Blokujemy SIGUSR1 i SIGTERM na czas synchronizacji, więc te sygnały nie mogą spowodować tego błędu.
+                        // If function read was interrupted by receiving a signal. SIGUSR1 and SIGTERM are blocked for the synchronization so those signals cannot cause this error.
                         if (errno == EINTR)
-                            // Ponawiamy próbę odczytu.
+                            // Retry reading.
                             continue;
-                        // Jeżeli wystąpił inny błąd
-                        // Ustawiamy kod błędu.
+                        // If other error occured
+                        // Set an error code.
                         ret = -5;
-                        // BUFFERSIZE - BUFFERSIZE == 0, więc druga pętla się nie wykona
+                        // BUFFERSIZE - BUFFERSIZE == 0 so the second loop is not executed
                         remainingBytes = BUFFERSIZE;
-                        // Ustawiamy 0, aby warunek if(bytesRead == 0) przerwał zewnętrzną pętlę while(1).
+                        // Set 0 so condition if (bytesRead == 0) breaks external loop while (1).
                         bytesRead = 0;
-                        // Przerywamy pętlę.
+                        // Break the inner loop.
                         break;
                     }
-                    // O liczbę bajtów odczytanych w aktualnej iteracji zmniejszamy liczbę pozostałych bajtów i
+                    // Decrease the number of remaining bytes by the number of bytes read in the current iteration and
                     remainingBytes -= bytesRead;
-                    // przesuwamy pozycję w buforze.
+                    // move the position in the buffer.
                     position += bytesRead;
                 }
-                position = buffer;                            // str. 48
-                remainingBytes = BUFFERSIZE - remainingBytes; // zapisujemy całkowitą liczbę odczytanych bajtów, która zawsze jest mniejsza lub równa rozmiarowi bufora
+                position = buffer; // page 48
+                remainingBytes = BUFFERSIZE - remainingBytes; // Save the total number of read bytes that is always less or equal to the buffer size.
                 ssize_t bytesWritten;
-                // Dopóki liczby bajtów pozostałych do zapisania i bajtów zapisanych w aktualnej iteracji są niezerowe.
+                // While numbers of remaining bytes and bytes written in the current iteration are non-zero.
                 while (remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
                 {
-                    // Jeżeli wystąpił błąd w funkcji write.
+                    // If an error occured in function write.
                     if (bytesWritten == -1)
                     {
-                        // Jeżeli funkcja write została przerwana odebraniem sygnału.
+                        // If function write was interrupted by receiving a signal.
                         if (errno == EINTR)
-                            // Ponawiamy próbę zapisu.
+                            // Retry writing.
                             continue;
-                        // Jeżeli wystąpił inny błąd
-                        // Ustawiamy kod błędu.
+                        // If other error occured
+                        // Set an error code.
                         ret = -6;
-                        // Ustawiamy 0, aby warunek if(bytesRead == 0) przerwał zewnętrzną pętlę while(1).
+                        // Set 0 so condition if (bytesRead == 0) breaks external loop while (1).
                         bytesRead = 0;
-                        // Przerywamy pętlę.
+                        // Break the inner loop.
                         break;
                     }
-                    // O liczbę bajtów zapisanych w aktualnej iteracji zmniejszamy liczbę pozostałych bajtów i
+                    // Decrease the number of remaining bytes by the number of bytes written in the current iteration and
                     remainingBytes -= bytesWritten;
-                    // przesuwamy pozycję w buforze.
+                    // move the position in the buffer.
                     position += bytesWritten;
                 }
-                // Jeżeli doszliśmy do końca pliku (EOF) lub wystąpił błąd
+                // If we came to the end of the source file (EOF) or an error occured
                 if (bytesRead == 0)
-                    // Przerywamy pętlę while(1).
+                    // Break external loop while (1).
                     break;
             }
-            // Zwalniamy pamięć bufora.
+            // Free buffer memory.
             free(buffer);
-            // Jeżeli nie wystąpił błąd podczas kopiowania
+            // If no error occured while copying
             if (ret >= 0)
             {
-                // Tworzymy strukturę zawierającą czasy ostatniego dostępu i modyfikacji.
+                // Create a structure containing last access and modification times.
                 const struct timespec times[2] = {*dstAccessTime, *dstModificationTime};
-                // Muszą być ustawione po zakończeniu zapisów do pliku docelowego, bo zapisy ustawiają czas modyfikacji na aktualny czas systemowy. Ustawiamy je mu. Jeżeli wystąpił błąd
+                // Must be set after writing the target file ends because writing sets the modification time to the current operating system time. Set the times of the target file. If an error occured
                 if (futimens(out, times) == -1)
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = -7;
             }
         }
     }
-    // Jeżeli plik źródłowy został otwarty, to go zamykamy. Jeżeli wystąpił błąd
+    // If the source file was opened, close it. If an error occured
     if (in != -1 && close(in) == -1)
-        // Ustawiamy kod błędu. Nie traktujemy go jako błąd niekrytyczny, bo każdy niezamknięty plik zajmuje deskryptor, których proces może mieć tylko ograniczoną liczbę.
+        // Set an error code. Do not consider it a not-critical error because every unclosed file occupies a descriptor of which the process can have only a finite number.
         ret = -8;
-    // Jeżeli plik docelowy został otwarty, to go zamykamy. Jeżeli wystąpił błąd
+    // If the target file was opened, close it. If an error occured
     if (out != -1 && close(out) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -9;
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime)
 {
-    // Wstępnie zapisujemy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int ret = 0, in = -1, out = -1;
-    // Otwieramy plik źródłowy do odczytu i zapisujemy jego deskryptor. Jeżeli wystąpił błąd
+    // Open the source file for reading and save its descriptor. If an error occured
     if ((in = open(srcFilePath, O_RDONLY)) == -1)
-        // Ustawiamy kod błędu. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set an error code. After that, the program immediately goes to the end of the current function.
         ret = -1;
-    // Otwieramy plik docelowy do zapisu. Jeżeli nie istnieje, to go tworzymy, nadając puste uprawnienia, a jeżeli już istnieje, to go czyścimy. Zapisujemy jego deskryptor. Jeżeli wystąpił błąd
+    // Open the target file for writing. If it does not exist, create it with empty permissions. Otherwise, clear it. Save its descriptor. If an error occured
     else if ((out = open(dstFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0000)) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -2;
-    // Ustawiamy plikowi docelowemu uprawnienia dstMode. Jeżeli wystąpił błąd
+    // Set the target file dstMode permissions. If an error occured
     else if (fchmod(out, dstMode) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -3;
     else
     {
         char *map;
-        // Odwzorowujemy (mapujemy) w pamięci plik źródłowy w trybie do odczytu. Jeżeli wystąpił błąd
+        // Map the source file in memory for reading. If an error occured
         if ((map = mmap(0, fileSize, PROT_READ, MAP_SHARED, in, 0)) == MAP_FAILED)
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = -4;
         else
         {
-            // (str. 121) Wysyłamy jądru wskazówkę (poradę), że plik źródłowy będzie odczytywany sekwencyjnie. Jeżeli wystąpił błąd
+            // (page 121) Send an advice to the kernel that the source file will be read sequentially so it should be loaded in advance. If an error occured
             if (madvise(map, fileSize, MADV_SEQUENTIAL) == -1)
-                // Ustawiamy kod błędu niekrytycznego, bo bez porady też można odczytywać plik źródłowy, ale mniej wydajnie.
+                // Set a non-critical error code because the source file can be read even without the advice but less effectively.
                 ret = 1;
             char *buffer = NULL;
-            // Optymalny rozmiar bufora operacji wejścia-wyjścia dla danego pliku można sprawdzić w jego metadanych pobranych za pomocą stat, ale używamy odgórnie ustalonego rozmiaru.
-            // Rezerwujemy pamięć bufora. Jeżeli wystąpił błąd
+            // Optimal buffer size for input/output operations on a file can be checked in its metadata read using stat but we use a predefined size.
+            // Reserve buffer memory. If an error occured
             if ((buffer = malloc(sizeof(char) * BUFFERSIZE)) == NULL)
-                // Ustawiamy kod błędu.
+                // Set an error code.
                 ret = -5;
             else
             {
-                // Numer bajtu w pliku źródłowym.
+                // Byte index in the source file.
                 unsigned long long b;
-                // Pozycja w buforze.
+                // Position in the buffer.
                 char *position;
                 size_t remainingBytes;
                 ssize_t bytesWritten;
-                // Nie może być (b < fileSize - BUFFERSIZE), bo b i fileSize są typu unsigned, więc jeżeli fileSize < BUFFERSIZE i odejmiemy, to mamy przepełnienie.
+                // Cannot be (b < fileSize - BUFFERSIZE) because b and fileSize are of unsigned type so if fileSize < BUFFERSIZE and we subtract, then we have an overflow.
                 for (b = 0; b + BUFFERSIZE < fileSize; b += BUFFERSIZE)
                 {
-                    // Kopiujemy BUFFERSIZE (rozmiar bufora) bajtów ze zmapowanej pamięci do bufora.
+                    // Copy BUFFERSIZE (size of the buffer) bytes from the mapped memory to the buffer.
                     memcpy(buffer, map + b, BUFFERSIZE);
-                    // Poniższy algorytm jest na str. 48.
+                    // The algorithm below is on page 48.
                     position = buffer;
-                    // Zapisujemy całkowitą bajtów pozostałych do zapisania, która zawsze jest równa rozmiarowi bufora.
+                    // Save the total number of bytes remaining to be written which is always equal to buffer size.
                     remainingBytes = BUFFERSIZE;
-                    // Dopóki liczby bajtów pozostałych do zapisania i bajtów zapisanych w aktualnej iteracji są niezerowe.
+                    // While numbers of remaining bytes and bytes written in the current iteration are non-zero.
                     while (remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
                     {
-                        // Jeżeli wystąpił błąd w funkcji write.
+                        // If an error occured in function write.
                         if (bytesWritten == -1)
                         {
-                            // Jeżeli funkcja write została przerwana odebraniem sygnału. Blokujemy SIGUSR1 i SIGTERM na czas synchronizacji, więc te sygnały nie mogą spowodować tego błędu.
+                            // If function write was interrupted by receiving a signal. SIGUSR1 and SIGTERM are blocked for the synchronization so those signals cannot cause this error.
                             if (errno == EINTR)
-                                // Ponawiamy próbę zapisu.
+                                // Retry writing.
                                 continue;
-                            // Jeżeli wystąpił inny błąd
-                            // Ustawiamy kod błędu.
+                            // If other error occured
+                            // Set an error code.
                             ret = -6;
-                            // Ustawiamy b aby przerwać pętlę for.
+                            // Set b to break external loop for.
                             b = ULLONG_MAX - BUFFERSIZE;
-                            // Przerywamy pętlę.
+                            // Break the inner loop.
                             break;
                         }
-                        // O liczbę bajtów zapisanych w aktualnej iteracji zmniejszamy liczbę pozostałych bajtów i
+                        // Decrease the number of remaining bytes by the number of bytes written in the current iteration and
                         remainingBytes -= bytesWritten;
-                        // przesuwamy pozycję w buforze.
+                        // move the position in the buffer.
                         position += bytesWritten;
                     }
                 }
-                // Jeżeli jeszcze nie wystąpił błąd podczas kopiowania
+                // If no error occured while copying
                 if (ret >= 0)
                 {
-                    // Zapisujemy liczbę bajtów z końca pliku, które nie zmieściły się w jednym całym buforze.
+                    // Save the number of bytes located at the end of the source file which did not fit into one full buffer.
                     remainingBytes = fileSize - b;
-                    // Kopiujemy je ze zmapowanej pamięci do bufora.
+                    // Copy them from the mapped memory to the buffer.
                     memcpy(buffer, map + b, remainingBytes);
-                    // Zapisujemy pozycję pierwszego bajtu bufora.
+                    // Save the position of the first byte in the buffer.
                     position = buffer;
-                    // Dopóki liczby bajtów pozostałych do zapisania i bajtów zapisanych w aktualnej iteracji są niezerowe.
+                    // While numbers of remaining bytes and bytes written in the current iteration are non-zero.
                     while (remainingBytes != 0 && (bytesWritten = write(out, position, remainingBytes)) != 0)
                     {
-                        // Jeżeli wystąpił błąd w funkcji write.
+                        // If an error occured in function write.
                         if (bytesWritten == -1)
                         {
-                            // Jeżeli funkcja write została przerwana odebraniem sygnału.
+                            // If function write was interrupted by receiving a signal.
                             if (errno == EINTR)
-                                // Ponawiamy próbę zapisu.
+                                // Retry writing.
                                 continue;
-                            // Ustawiamy kod błędu.
+                            // Set an error code.
                             ret = -7;
-                            // Przerywamy pętlę.
+                            // Break the inner loop.
                             break;
                         }
-                        // O liczbę bajtów zapisanych w aktualnej iteracji zmniejszamy liczbę pozostałych bajtów i
+                        // Decrease the number of remaining bytes by the number of bytes written in the current iteration and
                         remainingBytes -= bytesWritten;
-                        // przesuwamy pozycję w buforze.
+                        // move the position in the buffer.
                         position += bytesWritten;
                     }
                 }
-                // Zwalniamy pamięć bufora.
+                // Free buffer memory.
                 free(buffer);
-                // Jeżeli nie wystąpił błąd podczas kopiowania
+                // If no error occured while copying
                 if (ret >= 0)
                 {
-                    // Tworzymy strukturę zawierającą czasy ostatniego dostępu i modyfikacji.
+                    // Create a structure containing last access and modification times.
                     const struct timespec times[2] = {*dstAccessTime, *dstModificationTime};
-                    // Muszą być ustawione po zakończeniu zapisów do pliku docelowego, bo zapisy ustawiają czas modyfikacji na aktualny czas systemowy. Ustawiamy je mu. Jeżeli wystąpił błąd
+                    // Must be set after writing the target file ends because writing sets the modification time to the current operating system time. Set the times of the target file. If an error occured
                     if (futimens(out, times) == -1)
-                        // Ustawiamy kod błędu.
+                        // Set an error code.
                         ret = -8;
                 }
             }
-            // Usuwamy odwzorowanie pliku źródłowego. Jeżeli wystąpił błąd
+            // Unmap the source file in memory. If an error occured
             if (munmap(map, fileSize) == -1)
-                // Ustawiamy kod błędu.
+                // Set an error code.
                 ret = -9;
         }
     }
-    // Jeżeli plik źródłowy został otwarty, to go zamykamy. Jeżeli wystąpił błąd
+    // If the source file was opened, close it. If an error occured
     if (in != -1 && close(in) == -1)
-        // Ustawiamy kod błędu. Nie traktujemy go jako błąd niekrytyczny, bo każdy niezamknięty plik zajmuje deskryptor, których proces może mieć tylko ograniczoną liczbę.
+        // Set an error code. Do not consider it a not-critical error because every unclosed file occupies a descriptor of which the process can have only a finite number.
         ret = -10;
-    // Jeżeli plik docelowy został otwarty, to go zamykamy. Jeżeli wystąpił błąd
+    // If the target file was opened, close it. If an error occured
     if (out != -1 && close(out) == -1)
-        // Ustawiamy kod błędu.
+        // Set an error code.
         ret = -11;
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 int removeFile(const char *path)
 {
-    // Unlink służy tylko do usuwania plików. Katalog usuwamy za pomocą rmdir, ale najpierw musimy zapewnić, aby był pusty. Usuwamy plik i zwracamy status.
+    // Unlink is used only for removing files. A directory we remove using rmdir but first we have to empty it. Remove the file and return a status code.
     return unlink(path);
 }
 
 int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst)
 {
     char *srcFilePath = NULL, *dstFilePath = NULL;
-    // Rezerwujemy pamięć na ścieżki plików z katalogu źródłowego (pliki źródłowe). Jeżeli wystąpił błąd
+    // Reserve memory for paths of files in the source directory. If an error occured
     if ((srcFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -1;
-    // Rezerwujemy pamięć na ścieżki plików z katalogu docelowego (pliki docelowe). Jeżeli wystąpił błąd
+    // Reserve memory for paths of files in the target directory. If an error occured
     if ((dstFilePath = malloc(sizeof(char) * PATH_MAX)) == NULL)
     {
-        // Zwalniamy już zarezerwowaną pamięć.
+        // Release already reserved memory.
         free(srcFilePath);
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -2;
     }
-    // Przepisujemy ścieżkę katalogu źródłowego jako początek ścieżek jego plików.
+    // Copy the source directory path as the beginning of its file paths.
     strcpy(srcFilePath, srcDirPath);
-    // Przepisujemy ścieżkę katalogu docelowego jako początek ścieżek jego plików.
+    // Copy the target directory path as the beginning of its file paths.
     strcpy(dstFilePath, dstDirPath);
-    // Zapisujemy wskaźniki na pierwszy plik źródłowy i docelowy.
+    // Save pointers to the first source and target files.
     element *curS = filesSrc->first, *curD = filesDst->first;
     struct stat srcFile, dstFile;
-    // Wstępnie zapisujemy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int status = 0, ret = 0;
-    // Otwieramy połączenie z logiem "/var/log/syslog".
+    // Open a connection to the log '/var/log/syslog'.
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
     while (curS != NULL && curD != NULL)
     {
         char *srcFileName = curS->entry->d_name, *dstFileName = curD->entry->d_name;
-        // Porównujemy w porządku leksykograficznym nazwy plików źródłowego i docelowego.
+        // Compare source and target file names in lexicographic order.
         int comparison = strcmp(srcFileName, dstFileName);
-        // Jeżeli plik źródłowy jest w porządku późniejszy niż docelowy
+        // If the source file is greater than the target file in the order
         if (comparison > 0)
         {
-            // Dopisujemy nazwę pliku docelowego do ścieżki jego katalogu.
+            // Append target file name to its parent directory path.
             stringAppend(dstFilePath, dstDirPathLength, dstFileName);
-            // Usuwamy plik docelowy.
+            // Remove the target file.
             status = removeFile(dstFilePath);
-            // Zapisujemy do logu informację o usunięciu.
+            // In the log, write a message about removal.
             syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
-            // Jeżeli wystąpił błąd
+            // If an error occured
             if (status != 0)
-                // Ustawiamy dodatni kod błędu, aby zaznaczyć niepełną synchronizację, ale nie przerywamy pętli.
+                // Set a positive error code to indicate partial synchronization but do not break the loop.
                 ret = 1;
-            // Przesuwamy wskaźnik na następny plik docelowy.
+            // Move the pointer to the next target file.
             curD = curD->next;
         }
         else
         {
-            // Dopisujemy nazwę pliku źródłowego do ścieżki jego katalogu.
+            // Append source file name to its parent directory path.
             stringAppend(srcFilePath, srcDirPathLength, srcFileName);
-            // Odczytujemy metadane pliku źródłowego. Jeżeli wystąpił błąd, to plik źródłowy jest niedostępny i nie będziemy mogli go również skopiować, gdy comparison < 0.
+            // Read source file metadata. If an error occured, the source file is unavailable and will not be able to be copied when comparison < 0.
             if (stat(srcFilePath, &srcFile) == -1)
             {
-                // Jeżeli plik źródłowy jest w porządku wcześniejszy niż plik docelowy
+                // If the source file is less than the target file in the order
                 if (comparison < 0)
                 {
-                    // Zapisujemy do logu informację o nieudanym kopiowaniu. Status zapisany przez stat do errno jest liczbą dodatnią.
+                    // In the log, write a message about unsuccessful copying. The status code written to errno by stat is a positive number.
                     syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 2;
                 }
-                // Jeżeli plik źródłowy jest w porządku równy plikowi docelowemu
+                // If the source file is equal to the target file in the order
                 else
                 {
-                    // Zapisujemy do logu informację o nieudanym odczycie metadanych.
+                    // In the log, save a message about unsuccessful metadata reading.
                     syslog(LOG_INFO, "odczytujemy metadane pliku źródłowego %s; %i\n", srcFilePath, errno);
-                    // Przesuwamy wskaźnik na następny plik docelowy.
+                    // Move the pointer to the next target file.
                     curD = curD->next;
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 3;
                 }
-                // Przesuwamy wskaźnik na następny plik źródłowy.
+                // Move the pointer to the next source file.
                 curS = curS->next;
-                // Przechodzimy do następnej iteracji pętli.
+                // Go to the next loop iteration.
                 continue;
             }
-            // Jeżeli poprawnie odczytaliśmy metadane
-            // Jeżeli plik źródłowy jest w porządku wcześniejszy niż docelowy
+            // If metadata was read correctly
+            // If the source file is less than the target file in the order
             if (comparison < 0)
             {
-                // Dopisujemy nazwę pliku źródłowego do ścieżki katalogu docelowego.
+                // Append source file name to the target directory path.
                 stringAppend(dstFilePath, dstDirPathLength, srcFileName);
-                // Jeżeli plik źródłowy jest mniejszy niż poziom dużego pliku
+                // If the source file is smaller than the big file threshold
                 if (srcFile.st_size < threshold)
-                    // Kopiujemy go jako mały plik. Przepisujemy uprawnienia i czas modyfikacji pliku źródłowego do pliku docelowego.
+                    // Copy it as a small file. Copy permissions and modification time of the source file to the target file.
                     status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-                // Jeżeli plik źródłowy jest większy lub równy niż poziom dużego pliku
+                // If the source file is bigger or the same size as the big file threshold
                 else
-                    // Kopiujemy go jako duży plik.
+                    // Copy it as a big file.
                     status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-                // Zapisujemy do logu informację o kopiowaniu.
+                // In the log, write a message about copying.
                 syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
-                // Jeżeli wystąpił błąd
+                // If an error occured
                 if (status != 0)
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 4;
-                // Przesuwamy wskaźnik na następny plik źródłowy.
+                // Move the pointer to the next source file.
                 curS = curS->next;
             }
-            // Jeżeli plik źródłowy jest w porządku równy docelowemu
+            // If the source file is equal to the target file in the order
             else
             {
-                // Dopisujemy nazwę pliku docelowego do ścieżki jego katalogu.
+                // Append target file name to its parent directory path.
                 stringAppend(dstFilePath, dstDirPathLength, dstFileName);
-                // Odczytujemy metadane pliku docelowego. Jeżeli wystąpił błąd, to plik docelowy jest niedostępny i nie będziemy mogli porównać czasów modyfikacji.
+                // Read target file metadata. If an error occured, the target file is unavailable and we will not be able to compare modification times.
                 if (stat(dstFilePath, &dstFile) == -1)
                 {
-                    // Zapisujemy do logu informację o nieudanym odczycie metadanych.
+                    // In the log, save a message about unsuccessful metadata reading.
                     syslog(LOG_INFO, "odczytujemy metadane pliku docelowego %s; %i\n", dstFilePath, errno);
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 5;
                 }
-                // Jeżeli poprawnie odczytaliśmy metadane i plik docelowy ma inny czas modyfikacji niż plik źródłowy (wcześniejszy - jest nieaktualny lub późniejszy - został edytowany)
+                // If metadata was read correctly and the target file has other modification time than the source file (earlier - target is outdated or later - target was modified)
                 else if (srcFile.st_mtim.tv_sec != dstFile.st_mtim.tv_sec || srcFile.st_mtim.tv_nsec != dstFile.st_mtim.tv_nsec)
                 {
-                    // Przepisujemy plik źródłowy do istniejącego pliku docelowego.
-                    // Jeżeli plik źródłowy jest mniejszy niż poziom dużego pliku
+                    // Copy the source file to an existing target file.
+                    // If the source file is smaller than the big file threshold
                     if (srcFile.st_size < threshold)
-                        // Kopiujemy go jako mały plik.
+                        // Copy it as a small file.
                         status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-                    // Jeżeli plik źródłowy jest większy lub równy niż poziom dużego pliku
+                    // If the source file is bigger or the same size as the big file threshold
                     else
-                        // Kopiujemy go jako duży plik.
+                        // Copy it as a big file.
                         status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-                    // Zapisujemy do logu informację o kopiowaniu.
+                    // In the log, write a message about copying.
                     syslog(LOG_INFO, "przepisujemy %s do %s; %i\n", srcFilePath, dstFilePath, status);
-                    // Jeżeli wystąpił błąd
+                    // If an error occured
                     if (status != 0)
-                        // Ustawiamy kod błędu.
+                        // Set an error code.
                         ret = 6;
                 }
-                // Przy kopiowaniu przepisujemy uprawnienia, ale jeżeli nie kopiowaliśmy pliku, to sprawdzamy, czy oba mają równe uprawnienia. Jeżeli pliki mają różne uprawnienia
+                // After copying, copy permissions but if the file was not copied, check if both files have equal permissions. If the files have different permissions
                 else if (srcFile.st_mode != dstFile.st_mode)
                 {
-                    // Przepisujemy uprawnienia pliku źródłowego do docelowego. Jeżeli wystąpił błąd
+                    // Copy permissions from the source file to the target file. If an error occured
                     if (chmod(dstFilePath, srcFile.st_mode) == -1)
                     {
-                        // Ustawiamy status różny od 0, bo errno ma wartość różną od 0.
+                        // Set status code not equal to 0 because errno has value not equal to 0.
                         status = errno;
-                        // Ustawiamy kod błędu.
+                        // Set an error code.
                         ret = 7;
                     }
-                    // Jeżeli nie wystąpił błąd
+                    // If no error occured
                     else
-                        // Ustawiamy status równy 0.
+                        // Set status code equal to 0.
                         status = 0;
-                    // Zapisujemy do logu informację o przepisaniu uprawnień.
+                    // In the log, write a message about copying permissions.
                     syslog(LOG_INFO, "przepisujemy uprawnienia pliku %s do %s; %i\n", srcFilePath, dstFilePath, status);
                 }
-                // Przesuwamy wskaźnik na następny plik źródłowy.
+                // Move the pointer to the next source file.
                 curS = curS->next;
-                // Przesuwamy wskaźnik na następny plik docelowy.
+                // Move the pointer to the next target file.
                 curD = curD->next;
             }
         }
     }
-    // Usuwamy pozostałe pliki z katalogu docelowego, jeżeli istnieją, począwszy od aktualnie wskazywanego przez curD, bo nie istnieją one w katalogu źródłowym.
+    // If any remaining files exist in the target directory, remove them because they do not exist in the source directory. Start removing at the file currently pointed to by curD.
     while (curD != NULL)
     {
         char *dstFileName = curD->entry->d_name;
-        // Dopisujemy nazwę pliku docelowego do ścieżki jego katalogu.
+        // Append target file name to its parent directory path.
         stringAppend(dstFilePath, dstDirPathLength, dstFileName);
-        // Usuwamy plik docelowy.
+        // Remove the target file.
         status = removeFile(dstFilePath);
-        // Zapisujemy do logu informację o usunięciu.
+        // In the log, write a message about removal.
         syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
-        // Jeżeli wystąpił błąd
+        // If an error occured
         if (status != 0)
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = 8;
-        // Przesuwamy wskaźnik na następny plik docelowy.
+        // Move the pointer to the next target file.
         curD = curD->next;
     }
-    // Kopiujemy pozostałe pliki z katalogu źródłowego, jeżeli istnieją, począwszy od aktualnie wskazywanego przez curS, bo nie istnieją one w katalogu docelowym.
+    // If any remaining files exist in the source directory, copy them because they do not exist in the target directory. Start copying at the file currently pointed to by curS.
     while (curS != NULL)
     {
         char *srcFileName = curS->entry->d_name;
-        // Dopisujemy nazwę pliku źródłowego do ścieżki jego katalogu.
+        // Append source file name to its parent directory path.
         stringAppend(srcFilePath, srcDirPathLength, srcFileName);
-        // Odczytujemy metadane pliku źródłowego. Jeżeli wystąpił błąd
+        // Read source file metadata. If an error occured
         if (stat(srcFilePath, &srcFile) == -1)
         {
-            // Zapisujemy do logu informację o nieudanym kopiowaniu.
+            // In the log, write a message about unsuccessful copying.
             syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = 9;
         }
         else
         {
-            // Dopisujemy nazwę pliku źródłowego do ścieżki katalogu docelowego.
+            // Append source file name to the target directory name.
             stringAppend(dstFilePath, dstDirPathLength, srcFileName);
-            // Jeżeli plik źródłowy jest mniejszy niż poziom dużego pliku
+            // If the source file is smaller than the big file threshold
             if (srcFile.st_size < threshold)
-                // Kopiujemy go jako mały plik.
+                // Copy it as a small file.
                 status = copySmallFile(srcFilePath, dstFilePath, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-            // Jeżeli plik źródłowy jest większy lub równy niż poziom dużego pliku
+            // If the source file is bigger or the same size as the big file threshold
             else
-                // Kopiujemy go jako duży plik.
+                // Copy it as a big file.
                 status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
-            // Zapisujemy do logu informację o kopiowaniu.
+            // In the log, write a message about copying.
             syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
-            // Jeżeli wystąpił błąd
+            // If an error occured
             if (status != 0)
-                // Ustawiamy kod błędu.
+                // Set an error code.
                 ret = 10;
         }
-        // Przesuwamy wskaźnik na następny plik źródłowy.
+        // Move the pointer to the next source file.
         curS = curS->next;
     }
-    // Zwalniamy pamięć ścieżek plików źródłowych.
+    // Release source file path memory.
     free(srcFilePath);
-    // Zwalniamy pamięć ścieżek plików docelowych.
+    // Release target file path memory.
     free(dstFilePath);
-    // Zamykamy połączenie z logiem.
+    // Close the connection to the log.
     closelog();
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *subdirsSrc, const char *dstDirPath, const size_t dstDirPathLength, list *subdirsDst, char *isReady)
 {
     char *srcSubdirPath = NULL, *dstSubdirPath = NULL;
-    // Rezerwujemy pamięć na ścieżki podkatalogów z katalogu źródłowego (podkatalogi źródłowe). Jeżeli wystąpił błąd
+    // Reserve memory for paths of subdirectories in the source directory (hereinafter referred to as source subdirectories). If an error occured
     if ((srcSubdirPath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -1;
-    // Rezerwujemy pamięć na ścieżki podkatalogów z katalogu docelowego (podkatalogi docelowe). Jeżeli wystąpił błąd
+    // Reserve memory for paths of subdirectories in the target directory (hereinafter referred to as target subdirectories). If an error occured
     if ((dstSubdirPath = malloc(sizeof(char) * PATH_MAX)) == NULL)
     {
-        // Zwalniamy już zarezerwowaną pamięć.
+        // Release already reserved memory.
         free(srcSubdirPath);
-        // Zwracamy kod błędu.
+        // Return an error code.
         return -2;
     }
-    // Przepisujemy ścieżkę katalogu źródłowego jako początek ścieżek jego podkatalogów.
+    // Copy the source directory path as the beginning of its subdirectory paths.
     strcpy(srcSubdirPath, srcDirPath);
-    // Przepisujemy ścieżkę katalogu docelowego jako początek ścieżek jego podkatalogów.
+    // Copy the target directory path as the beginning of its subdirectory paths.
     strcpy(dstSubdirPath, dstDirPath);
-    // Zapisujemy wskaźniki na pierwszy podkatalog źródłowy i docelowy.
+    // Save pointers to the first source and target subdirectories.
     element *curS = subdirsSrc->first, *curD = subdirsDst->first;
     struct stat srcSubdir, dstSubdir;
     unsigned int i = 0;
-    // Wstępnie zapisujemy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int status = 0, ret = 0;
-    // Otwieramy połączenie z logiem "/var/log/syslog".
+    // Open a connection to the log '/var/log/syslog'.
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
     while (curS != NULL && curD != NULL)
     {
         char *srcSubdirName = curS->entry->d_name, *dstSubdirName = curD->entry->d_name;
-        // Porównujemy w porządku leksykograficznym nazwy podkatalogów źródłowego i docelowego.
+        // Compare source and target subdirectory names in lexicographic order.
         int comparison = strcmp(srcSubdirName, dstSubdirName);
-        // Jeżeli podkatalog źródłowy jest w porządku późniejszy niż docelowy
+        // If the source subdirectory is greater than the target subdirectory in the order
         if (comparison > 0)
         {
-            // Dopisujemy nazwę podkatalogu docelowego do ścieżki jego katalogu. Funkcja removeDirectoryRecursively wymaga, aby ścieżka do katalogu była zakończona '/'.
+            // Append target subdirectory name to its parent directory path. Function removeDirectoryRecursively demands that the directory path end with '/'.
             size_t length = appendSubdirectoryName(dstSubdirPath, dstDirPathLength, dstSubdirName);
-            // Rekurencyjnie usuwamy podkatalog docelowy.
+            // Recursively remove the target subdirectory.
             status = removeDirectoryRecursively(dstSubdirPath, length);
-            // Zapisujemy do logu informację o usunięciu.
+            // In the log, write a message about removal.
             syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstSubdirPath, status);
-            // Jeżeli wystąpił błąd
+            // If an error occured
             if (status != 0)
-                // Ustawiamy dodatni kod błędu, aby zaznaczyć niepełną synchronizację, ale nie przerywamy pętli.
+                // Set a positive error code to indicate partial synchronization but do not break the loop.
                 ret = 1;
-            // Przesuwamy wskaźnik na następny podkatalog docelowy.
+            // Move the pointer to the next target subdirectory.
             curD = curD->next;
         }
         else
         {
-            // Dopisujemy nazwę podkatalogu źródłowego do ścieżki jego katalogu.
+            // Append source subdirectory name to its parent directory path.
             stringAppend(srcSubdirPath, srcDirPathLength, srcSubdirName);
-            // Odczytujemy metadane podkatalogu źródłowego. Jeżeli wystąpił błąd, to podkatalog źródłowy jest niedostępny i nie będziemy mogli go również utworzyć, gdy comparison < 0, bo nawet gdybyśmy go utworzyli, to go nie zsynchronizujemy.
+            // Read source subdirectory metadata. If an error occured, the source subdirectory is unavailable and will not be able to be created when comparison < 0. Even if we created it, we would not be able to synchronize it.
             if (stat(srcSubdirPath, &srcSubdir) == -1)
             {
-                // Jeżeli podkatalog źródłowy jest w porządku wcześniejszy niż docelowy
+                // If the source subdirectory is less than the target subdirectory in the order
                 if (comparison < 0)
                 {
-                    // Zapisujemy do logu informację o nieudanym kopiowaniu. Status zapisany przez stat do errno jest liczbą dodatnią.
+                    // In the log, write a message about unsuccessful copying. The status code written to errno by stat is a positive number.
                     syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, errno);
-                    // Zaznaczamy, że podkatalog nie jest gotowy do synchronizacji, bo nie istnieje.
+                    // Indicate that the subdirectory is unready for synchronization because it does not exist.
                     isReady[i++] = 0;
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 2;
                 }
                 else
                 {
-                    // Zapisujemy do logu informację o nieudanym odczycie metadanych.
+                    // In the log, save a message about unsuccessful metadata reading.
                     syslog(LOG_INFO, "odczytujemy metadane katalogu źródłowego %s; %i\n", srcSubdirPath, errno);
-                    // Jeżeli nie udało się sprawdzić, czy podkatalogi źródłowy i docelowy mają takie same uprawnienia, to zakładamy, że mają. Zaznaczamy, że podkatalog jest gotowy do synchronizacji.
+                    // If we did not manage to check if source and target subdirectories have equal permissions, assume that they do. Indicate that the subdirectory is ready for synchronization.
                     isReady[i++] = 1;
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 3;
-                    // Przesuwamy wskaźnik na następny podkatalog docelowy.
+                    // Move the pointer to the next target subdirectory.
                     curD = curD->next;
                 }
-                // Przesuwamy wskaźnik na następny podkatalog źródłowy.
+                // Move the pointer to the next source subdirectory.
                 curS = curS->next;
-                // Przechodzimy do następnej iteracji pętli.
+                // Go to the next loop iteration.
                 continue;
             }
-            // Jeżeli poprawnie odczytaliśmy metadane
-            // Jeżeli podkatalog źródłowy jest w porządku wcześniejszy niż docelowy
+            // If metadata was read correctly
+            // If the source subdirectory is less than the target subdirectory in the order
             if (comparison < 0)
             {
-                // Dopisujemy nazwę podkatalogu źródłowego do ścieżki katalogu docelowego.
+                // Append source subdirectory name to the target directory path.
                 stringAppend(dstSubdirPath, dstDirPathLength, srcSubdirName);
-                // Tworzymy w katalogu docelowym katalog o nazwie takiej jak podkatalogu źródłowego. Przepisujemy uprawnienia, ale nie przepisujemy czasu modyfikacji, bo nie zwracamy na niego uwagi przy synchronizacji - wszystkie podkatalogi i tak będą rekurencyjnie przejrzane w celu wykrycia zmian plików.
+                // In the target directory, create a subdirectory named the same as the source subdirectory. Copy permissions but do not copy modification time because we ignore it during synchronization - all subdirectories are browsed to detect file changes.
                 status = createEmptyDirectory(dstSubdirPath, srcSubdir.st_mode);
-                // Zapisujemy do logu informację o utworzeniu.
+                // In the log, write a meesage about creation.
                 syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, status);
-                // Jeżeli wystąpił błąd
+                // If an error occured
                 if (status != 0)
                 {
-                    // Zaznaczamy, że podkatalog nie jest gotowy do synchronizacji, bo nie istnieje.
+                    // Indicate that the subdirectory is unready for synchronization because it does not exist.
                     isReady[i++] = 0;
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 4;
                 }
                 else
-                    // Zaznaczamy, że podkatalog jest gotowy do synchronizacji.
+                    // Indicate that the subdirectory is ready for synchronization.
                     isReady[i++] = 1;
-                // Przesuwamy wskaźnik na następny podkatalog źródłowy.
+                // Move the pointer to the next source subdirectory.
                 curS = curS->next;
             }
-            // Jeżeli podkatalog źródłowy jest w porządku równy docelowemu
+            // If the source subdirectory is equal to the target subdirectory in the order
             else
             {
-                // Zaznaczamy, że podkatalog jest gotowy do synchronizacji, nawet jeżeli nie uda się porównać uprawnień.
+                // Indicate that the subdirectory is ready for synchronization even if permission comparison is unsuccessful.
                 isReady[i++] = 1;
-                // Dopisujemy nazwę podkatalogu docelowego do ścieżki jego katalogu.
+                // Append target subdirectory name to its parent directory path.
                 stringAppend(dstSubdirPath, dstDirPathLength, dstSubdirName);
-                // Odczytujemy metadane podkatalogu docelowego. Jeżeli wystąpił błąd, to podkatalog docelowy jest niedostępny i nie będziemy mogli porównać uprawnień.
+                // Read target subdirectory metadata. If an error occured, the target subdirectory is unavailable and we will not be able to compare permissions.
                 if (stat(dstSubdirPath, &dstSubdir) == -1)
                 {
-                    // Zapisujemy do logu informację o nieudanym odczycie metadanych.
+                    // In the log, save a message about unsuccessful metadata reading.
                     syslog(LOG_INFO, "odczytujemy metadane katalogu docelowego %s; %i\n", dstSubdirPath, errno);
-                    // Ustawiamy kod błędu.
+                    // Set an error code.
                     ret = 5;
                 }
-                // Ignorujemy czas modyfikacji podkatalogu (zmienia się on podczas tworzenia i usuwania plików z podkatalogu).
-                // Jeżeli poprawnie odczytaliśmy metadane i podkatalogi mają różne uprawnienia
+                // Ignore subdirectory modification time (it changes on file creation and deletion in the subdirectory).
+                // If metadata was read correctly and source and target directories have different permissions
                 else if (srcSubdir.st_mode != dstSubdir.st_mode)
                 {
-                    // Przepisujemy uprawnienia podkatalogu źródłowego do docelowego. Jeżeli wystąpił błąd
+                    // Copy permissions from source to target subdirectory. If an error occured
                     if (chmod(dstSubdirPath, srcSubdir.st_mode) == -1)
                     {
-                        // Ustawiamy status różny od 0, bo errno ma wartość różną od 0.
+                        // Set status code not equal to 0 because errno has value not equal to 0.
                         status = errno;
-                        // Ustawiamy kod błędu.
+                        // Set an error code.
                         ret = 6;
                     }
-                    // Jeżeli nie wystąpił błąd
+                    // If no error occured
                     else
-                        // Ustawiamy status równy 0.
+                        // Set status code equal to 0.
                         status = 0;
-                    // Zapisujemy do logu informację o przepisaniu uprawnień.
+                    // In the log, write a message about copying permissions.
                     syslog(LOG_INFO, "przepisujemy uprawnienia katalogu %s do %s; %i\n", srcSubdirPath, dstSubdirPath, status);
                 }
-                // Przesuwamy wskaźnik na następny podkatalog źródłowy.
+                // Move the pointer to the next source subdirectory.
                 curS = curS->next;
-                // Przesuwamy wskaźnik na następny podkatalog docelowy.
+                // Move the pointer to the next target subdirectory.
                 curD = curD->next;
             }
         }
     }
-    // Usuwamy pozostałe podkatalogi z katalogu docelowego, jeżeli istnieją, począwszy od aktualnie wskazywanego przez curD, bo nie istnieją one w katalogu źródłowym.
+    // If any remaining subdirectories exist in the target directory, remove them because they do not exist in the source directory. Start removing at the subdirectory currently pointed to by curD.
     while (curD != NULL)
     {
         char *dstSubdirName = curD->entry->d_name;
-        // Dopisujemy nazwę podkatalogu docelowego do ścieżki jego katalogu.
+        // Append target subdirectory name to its parent directory path.
         size_t length = appendSubdirectoryName(dstSubdirPath, dstDirPathLength, dstSubdirName);
-        // Rekurencyjnie usuwamy podkatalog docelowy.
+        // Recursively remove the target subdirectory.
         status = removeDirectoryRecursively(dstSubdirPath, length);
-        // Zapisujemy do logu informację o usunięciu.
+        // In the log, write a message about removal.
         syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstSubdirPath, status);
-        // Jeżeli wystąpił błąd
+        // If an error occured
         if (status != 0)
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = 7;
-        // Przesuwamy wskaźnik na następny podkatalog docelowy.
+        // Move the pointer to the next target subdirectory.
         curD = curD->next;
     }
-    // Kopiujemy pozostałe podkatalogi z katalogu źródłowego, jeżeli istnieją, począwszy od aktualnie wskazywanego przez curS, bo nie istnieją one w katalogu docelowym.
+    // If any remaining subdirectories exist in the source directory, copy them because they do not exist in the target directory. Start copying at the file currently pointed to by curS.
     while (curS != NULL)
     {
         char *srcSubdirName = curS->entry->d_name;
-        // Dopisujemy nazwę podkatalogu źródłowego do ścieżki jego katalogu.
+        // Append source subdirectory name to its parent directory path.
         stringAppend(srcSubdirPath, srcDirPathLength, srcSubdirName);
-        // Odczytujemy metadane podkatalogu źródłowego. Jeżeli wystąpił błąd
+        // Read source subdirectory metadata. If an error occured
         if (stat(srcSubdirPath, &srcSubdir) == -1)
         {
-            // Zapisujemy do logu informację o nieudanym utworzeniu.
+            // In the log, write a message about unsuccessful creation.
             syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, errno);
-            // Zaznaczamy, że podkatalog nie jest gotowy do synchronizacji, bo nie istnieje.
+            // Indicate that the subdirectory is unready for synchronization because it does not exist.
             isReady[i++] = 0;
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = 8;
-            // Przesuwamy wskaźnik na następny podkatalog źródłowy.
+            // Move the pointer to the next source subdirectory.
             curS = curS->next;
-            // Przechodzimy do następnej iteracji pętli.
+            // Go to the next loop iteration.
             continue;
         }
-        // Dopisujemy nazwę podkatalogu źródłowego do ścieżki katalogu docelowego.
+        // Append source subdirectory name to the target directory name.
         stringAppend(dstSubdirPath, dstDirPathLength, srcSubdirName);
-        // Tworzymy w katalogu docelowym katalog o nazwie takiej jak podkatalogu źródłowego.
+        // In the target directory, create a subdirectory named the same as the source subdirectory and copy permissions.
         status = createEmptyDirectory(dstSubdirPath, srcSubdir.st_mode);
-        // Zapisujemy do logu informację o utworzeniu.
+        // In the log, write a message about creation.
         syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, status);
-        // Jeżeli wystąpił błąd
+        // If an error occured
         if (status != 0)
         {
-            // Zaznaczamy, że podkatalog nie jest gotowy do synchronizacji, bo nie istnieje.
+            // Indicate that the subdirectory is unready for synchronization because it does not exist.
             isReady[i++] = 0;
-            // Ustawiamy kod błędu.
+            // Set an error code.
             ret = 9;
         }
         else
-            // Zaznaczamy, że podkatalog jest gotowy do synchronizacji.
+            // Indicate that the subdirectory is ready for synchronization.
             isReady[i++] = 1;
-        // Przesuwamy wskaźnik na następny podkatalog źródłowy.
+        // Move the pointer to the next source subdirectory.
         curS = curS->next;
     }
-    // Zwalniamy pamięć ścieżek podkatalogów źródłowych.
+    // Release source subdirectory path memory.
     free(srcSubdirPath);
-    // Zwalniamy pamięć ścieżek podkatalogów docelowych.
+    // Release target subdirectory path memory.
     free(dstSubdirPath);
-    // Zamykamy połączenie z logiem.
+    // Close the connection to the log.
     closelog();
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 
 int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
 {
-    // Wstępnie ustawiamy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int ret = 0;
     DIR *dirS = NULL, *dirD = NULL;
-    // Otwieramy katalog źródłowy. Jeżeli wystąpił błąd
+    // Open the source directory. If an error occured
     if ((dirS = opendir(sourcePath)) == NULL)
-        // Ustawiamy status oznaczający błąd. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set status code indicating an error. After that, the program immediately goes to the end of the current function.
         ret = -1;
-    // Otwieramy katalog docelowy. Jeżeli wystąpił błąd
+    // Open the target directory. If an error occured
     else if ((dirD = opendir(destinationPath)) == NULL)
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -2;
     else
     {
-        // Tworzymy listy na pliki z katalogu źródłowego i docelowego.
+        // Create lists for source and target directory files.
         list filesS, filesD;
-        // Inicjujemy listę plików z katalogu źródłowego.
+        // Initialize the source directory file list.
         initialize(&filesS);
-        // Inicjujemy listę plików z katalogu docelowego.
+        // Initialize the target directory file list.
         initialize(&filesD);
-        // Wypełniamy listę plików z katalogu źródłowego. Jeżeli wystąpił błąd
+        // Fill the source directory file list. If an error occured
         if (listFiles(dirS, &filesS) < 0)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -3;
-        // Wypełniamy listę plików z katalogu docelowego. Jeżeli wystąpił błąd
+        // Fill the target directory file list. If an error occured
         else if (listFiles(dirD, &filesD) < 0)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -4;
         else
         {
-            // Sortujemy listę plików z katalogu źródłowego.
+            // Sort the source directory file list.
             listMergeSort(&filesS);
-            // Sortujemy listę plików z katalogu docelowego.
+            // Sort the target directory file list.
             listMergeSort(&filesD);
-            // Sprawdzamy zgodność i ewentualnie aktualizujemy pliki w katalogu docelowym. Jeżeli wystąpił błąd
+            // Check compliance and if needed, update target directory files. If an error occured
             if (updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD) != 0)
-                // Ustawiamy status oznaczający błąd.
+                // Set status code indicating an error.
                 ret = -5;
         }
-        // Czyścimy listę plików z katalogu źródłowego.
+        // Clear the source directory file list.
         clear(&filesS);
-        // Czyścimy listę plików z katalogu docelowego.
+        // Clear the target directory file list.
         clear(&filesD);
     }
-    // Jeżeli w którymś momencie wystąpił błąd, to przechodzimy do tego miejsca.
-    // Zamknąć katalog możemy dopiero, gdy skończymy używać obiektów typu dirent, które odczytaliśmy z niego za pomocą readdir, bo są one usuwane z pamięci w momencie wywołania closedir. Jeżeli katalog źródłowy został otwarty
+    // If an error occured somewhere, go here.
+    // Objects of type dirent, which we read from the directory using readdir, are removed from memory on calling closedir. Therefore, we cannot close the directory until we finish using dirent objects. If the source directory was opened
     if (dirS != NULL)
-        // Zamykamy katalog źródłowy. Jeżeli wystąpił błąd, to go ignorujemy.
+        // Close the source directory. If an error occured, ignore it.
         closedir(dirS);
-    // Jeżeli katalog docelowy został otwarty
+    // If the target directory was opened
     if (dirD != NULL)
-        // Zamykamy katalog docelowy. Jeżeli wystąpił błąd, to go ignorujemy.
+        // Close the target directory. If an error occured, ignore it.
         closedir(dirD);
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
 int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength)
 {
-    // Wstępnie ustawiamy status oznaczający brak błędu.
+    // Initially, set status code indicating no error.
     int ret = 0;
     DIR *dirS = NULL, *dirD = NULL;
-    // Otwieramy katalog źródłowy. Jeżeli wystąpił błąd
+    // Open the source directory. If an error occured
     if ((dirS = opendir(sourcePath)) == NULL)
-        // Ustawiamy status oznaczający błąd. Po tym program natychmiast przechodzi na koniec funkcji.
+        // Set status code indicating an error. After that, the program immediately goes to the end of the current function.
         ret = -1;
-    // Otwieramy katalog docelowy. Jeżeli wystąpił błąd
+    // Open the target directory. If an error occured
     else if ((dirD = opendir(destinationPath)) == NULL)
-        // Ustawiamy status oznaczający błąd.
+        // Set status code indicating an error.
         ret = -2;
     else
     {
-        // Tworzymy listy na pliki i podkatalogi z katalogu źródłowego.
+        // Create lists for source directory files and subdirectories.
         list filesS, subdirsS;
-        // Inicjujemy listę plików z katalogu źródłowego.
+        // Initialize the source directory file list.
         initialize(&filesS);
-        // Inicjujemy listę podkatalogów z katalogu źródłowego.
+        // Initialize the source directory subdirectory list.
         initialize(&subdirsS);
-        // Tworzymy listy na pliki i podkatalogi z katalogu docelowego.
+        // Create lists for target directory files and subdirectories.
         list filesD, subdirsD;
-        // Inicjujemy listę plików z katalogu docelowego.
+        // Initialize the target directory file list.
         initialize(&filesD);
-        // Inicjujemy listę podkatalogów z katalogu docelowego.
+        // Initialize the target directory subdirectory list.
         initialize(&subdirsD);
-        // Wypełniamy listy plików i podkatalogów z katalogu źródłowego. Jeżeli wystąpił błąd
+        // Fill the source directory file and subdirectory lists. If an error occured
         if (listFilesAndDirectories(dirS, &filesS, &subdirsS) < 0)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -3;
-        // Wypełniamy listy plików i podkatalogów z katalogu docelowego. Jeżeli wystąpił błąd
+        // Fill the target directory file and subdirectory lists. If an error occured
         else if (listFilesAndDirectories(dirD, &filesD, &subdirsD) < 0)
-            // Ustawiamy status oznaczający błąd.
+            // Set status code indicating an error.
             ret = -4;
         else
         {
-            // Sortujemy listę plików z katalogu źródłowego.
+            // Sort the source directory file list.
             listMergeSort(&filesS);
-            // Sortujemy listę plików z katalogu docelowego.
+            // Sort the target directory file list.
             listMergeSort(&filesD);
-            // Sprawdzamy zgodność i ewentualnie aktualizujemy pliki w katalogu docelowym. Jeżeli wystąpił błąd
+            // Check compliance and if needed, update target directory files. If an error occured
             if (updateDestinationFiles(sourcePath, sourcePathLength, &filesS, destinationPath, destinationPathLength, &filesD) != 0)
-                // Ustawiamy status oznaczający błąd.
+                // Set status code indicating an error.
                 ret = -5;
-            // Czyścimy listę plików z katalogu źródłowego.
+            // Clear the source directory file list.
             clear(&filesS);
-            // Czyścimy listę plików z katalogu docelowego.
+            // Clear the target directory file list.
             clear(&filesD);
 
-            // Sortujemy listę podkatalogów z katalogu źródłowego.
+            // Sort the source directory subdirectory list.
             listMergeSort(&subdirsS);
-            // Sortujemy listę podkatalogów z katalogu docelowego.
+            // Sort the target directory subdirectory list.
             listMergeSort(&subdirsD);
-            // W komórce i tablicy isReady wpiszemy 1, jeżeli i-ty podkatalog z katalogu źródłowego istnieje lub zostanie prawidłowo utworzony w katalogu docelowym podczas funkcji updateDestinationDirectories, czyli będzie gotowy do rekurencyjnej synchronizacji.
+            // Set i-th cell of array isReady to 1 if i-th source subdirectory exists or will be correctly created in the target directory by function updateDestinationDirectories so it will be ready for recursive synchronization.
             char *isReady = NULL;
-            // Rezerwujemy pamięć na tablicę o rozmiarze równym liczbie podkatalogów w katalogu źródłowym. Jeżeli wystąpił błąd
+            // Reserve memory for an array with size equal to the number of source subdirectories. If an error occured
             if ((isReady = malloc(sizeof(char) * subdirsS.count)) == NULL)
-                // Ustawiamy status oznaczający błąd.
+                // Set status code indicating an error.
                 ret = -6;
             else
             {
-                // Sprawdzamy zgodność i ewentualnie aktualizujemy podkatalogi w katalogu docelowym. Wypełniamy tablicę isReady. Jeżeli wystąpił błąd
+                // Check compliance and if needed, update target directory subdirectories. Fill array isReady. If an error occured
                 if (updateDestinationDirectories(sourcePath, sourcePathLength, &subdirsS, destinationPath, destinationPathLength, &subdirsD, isReady) != 0)
-                    // Ustawiamy status oznaczający błąd.
+                    // Set status code indicating an error.
                     ret = -7;
-                // Jeszcze nie czyścimy listy podkatalogów z katalogu źródłowego, bo rekurencyjnie będziemy wywoływać funkcję synchronizeRecursively na tych podkatalogach.
-                // Czyścimy listę podkatalogów z katalogu docelowego.
+                // Do not clear source subdirectory list yet because function synchronizeRecursively will be recursively called on subdirectories from that list.
+                // Clear target subdirectory list.
                 clear(&subdirsD);
 
                 char *nextSourcePath = NULL, *nextDestinationPath = NULL;
-                // Rezerwujemy pamięć na ścieżki podkatalogów z katalogu źródłowego. Jeżeli wystąpił błąd
+                // Reserve memory for source subdirectory paths. If an error occured
                 if ((nextSourcePath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-                    // Ustawiamy status oznaczający błąd.
+                    // Set status code indicating an error.
                     ret = -8;
-                // Rezerwujemy pamięć na ścieżki podkatalogów z katalogu docelowego. Jeżeli wystąpił błąd
+                // Reserve memory for target subdirectory paths. If an error occured
                 else if ((nextDestinationPath = malloc(sizeof(char) * PATH_MAX)) == NULL)
-                    // Ustawiamy status oznaczający błąd.
+                    // Set status code indicating an error.
                     ret = -9;
                 else
                 {
-                    // Przepisujemy ścieżkę katalogu źródłowego jako początek ścieżek jego podkatalogów.
+                    // Copy the source directory path as the beginning of its subdirectory paths.
                     strcpy(nextSourcePath, sourcePath);
-                    // Przepisujemy ścieżkę katalogu docelowego jako początek ścieżek jego podkatalogów.
+                    // Copy the target directory path as the beginning of its subdirectory paths.
                     strcpy(nextDestinationPath, destinationPath);
-                    // Zapisujemy wskaźnik na pierwszy podkatalog z katalogu źródłowego.
+                    // Save a pointer to the first source subdirectory.
                     element *curS = subdirsS.first;
                     unsigned int i = 0;
                     while (curS != NULL)
                     {
-                        // Jeżeli podkatalog jest gotowy do synchronizacji
+                        // If the subdirectory is ready for synchronization
                         if (isReady[i++] == 1)
                         {
-                            // Tworzymy ścieżkę podkatalogu z katalogu źródłowego i zapisujemy jej długość.
+                            // Create the source subdirectory path and save its length.
                             size_t nextSourcePathLength = appendSubdirectoryName(nextSourcePath, sourcePathLength, curS->entry->d_name);
-                            // Tworzymy ścieżkę podkatalogu z katalogu docelowego i zapisujemy jej długość.
+                            // Create the target subdirectory path and save its length.
                             size_t nextDestinationPathLength = appendSubdirectoryName(nextDestinationPath, destinationPathLength, curS->entry->d_name);
-                            // Rekurencyjnie synchronizujemy podkatalogi. Jeżeli wystąpił błąd
+                            // Recursively synchronize subdirectories. If an error occured
                             if (synchronizeRecursively(nextSourcePath, nextSourcePathLength, nextDestinationPath, nextDestinationPathLength) < 0)
-                                // Ustawiamy status oznaczający błąd.
+                                // Set status code indicating an error.
                                 ret = -10;
                         }
-                        // Jeżeli podkatalog nie jest gotowy do synchronizacji, to go pomijamy.
-                        // Przesuwamy wskaźnik na następny podkatalog.
+                        // If the subdirectory is unready for synchronization, skip it.
+                        // Move the pointer to the next subdirectory.
                         curS = curS->next;
                     }
                 }
-                // Zwalniamy tablicę isReady.
+                // Free array isReady.
                 free(isReady);
-                // Jeżeli pamięć na ścieżkę podkatalogu z katalogu źródłowego została zarezerwowana
+                // If memory for source subdirectory paths was reserved
                 if (nextSourcePath != NULL)
-                    // Zwalniamy pamięć.
+                    // Release memory.
                     free(nextSourcePath);
-                // Jeżeli pamięć na ścieżkę podkatalogu z katalogu docelowego została zarezerwowana
+                // If memory for target directory paths was reserved
                 if (nextDestinationPath != NULL)
-                    // Zwalniamy pamięć.
+                    // Release memory.
                     free(nextDestinationPath);
             }
         }
-        // Czyścimy listę podkatalogów z katalogu źródłowego.
+        // Clear the source subdirectory list.
         clear(&subdirsS);
-        // Jeżeli nie udało się zarezerwować pamięci na isReady, to lista dirsD podkatalogów z katalogu docelowego nie została jeszcze wyczyszczona. Jeżeli zawiera jakieś elementy
+        // If reserving memory for isReady failed, the list subdirsD of target subdirectories was not cleared. If it contains any nodes
         if (subdirsD.count != 0)
-            // Czyścimy ją.
+            // Clear it.
             clear(&subdirsD);
     }
-    // Jeżeli katalog źródłowy został otwarty
+    
+    // If the source directory was opened
     if (dirS != NULL)
-        // Zamykamy katalog źródłowy. Jeżeli wystąpił błąd, to go ignorujemy.
+        // Close the source directory. If an error occured, ignore it.
         closedir(dirS);
-    // Jeżeli katalog docelowy został otwarty
+    // If the target directory was opened
     if (dirD != NULL)
-        // Zamykamy katalog docelowy. Jeżeli wystąpił błąd, to go ignorujemy.
+        // Close the target directory. If an error occured, ignore it.
         closedir(dirD);
-    // Zwracamy status.
+    // Return the status code.
     return ret;
 }
