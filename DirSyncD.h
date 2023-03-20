@@ -6,44 +6,44 @@
 
 typedef struct element element;
 /*
-Element listy jednokierunkowej przechowujący wskaźnik na element katalogu i na następny element listy.
+Singly linked list node storing pointers to a directory entry and to next list node.
 */
 struct element;
 /*
-Porównuje elementy listy jednokierunkowej.
-odczytuje:
-a - pierwszy element
-b - drugi element
-zwraca:
-< 0, jeżeli a jest przed b w porządku leksykograficznym według nazwy elementu katalogu
-0, jeżeli a i b mają równe nazwy elementu katalogu
-> 0, jeżeli a jest po b w porządku leksykograficznym według nazwy elementu katalogu
+Compares nodes of a singly linked list.
+reads:
+a - first node
+b - second node
+returns:
+< 0 if a is before b in lexicographic order by directory entry name
+0 if a and b have equal directory entry names
+> 0 if a is after b in lexicographic order by directory entry name
 */
 int cmp(element *a, element *b);
 
 typedef struct list list;
 /*
-Lista jednokierunkowa. W funkcjach do niej zakładamy, że podano prawidłowy wskaźnik do listy.
+Singly linked list. In functions operating on a list, we assume that a valid pointer to it is given.
 */
 struct list;
 /*
-Inicjuje listę jednokierunkową.
-zapisuje:
-l - pusta lista jednokierunkowa przeznaczona do pierwszego użycia
+Initializes the singly linked list.
+writes:
+l - empty singly linked list intended for the first use
 */
 void initialize(list *l);
 /*
-Dodaje element katalogu na koniec listy.
-odczytuje:
-newEntry - element katalogu, który dodajemy na koniec listy
-zapisuje:
-l - lista jednokierunkowa ze wstawionym na końcu elementem zawierającym element katalogu newEntry
+Adds a directory entry at the end of the list.
+reads:
+newEntry - directory entry to be added at the end of the list
+writes:
+l - singly linked list with added node containing directory entry newEntry
 */
 int pushBack(list *l, struct dirent *newEntry);
 /*
-Czyści listę jednokierunkową.
-zapisuje:
-l - pusta lista jednokierunkowa przeznaczona do ponownego użycia
+Clears the singly linked list.
+writes:
+l - empty singly linked list intended for reuse
 */
 void clear(list *l);
 /* https://www.chiark.greenend.org.uk/~sgtatham/algorithms/listsort.html
@@ -71,230 +71,230 @@ void clear(list *l);
  * SOFTWARE.
  */
 /*
-Sortuje przez scalanie listę jednokierunkową. Funkcja zawiera oryginalne komentarze autora.
-zapisuje:
-l - lista jednokierunkowa posortowana z wykorzystaniem funkcji cmp porównującej elementy
+Sorts by merging the singly linked list. This function contains author's original comments.
+writes:
+l - singly linked list sorted using cmp function comparing nodes
 */
 void listMergeSort(list *l);
 
 /*
-Dopisuje napis src do napisu dst, począwszy od pozycji o numerze offset.
-odczytuje:
-offset - numer bajtu w ciągu dst, od którego zaczynamy wstawiać ciąg src
-src - ciąg wstawiany do ciągu dst
-zapisuje:
-dst - ciąg, do którego wstawiamy ciąg src
+Appends string src to string dst, starting at position with index offset.
+reads:
+offset - byte index string dst at which we start inserting string src
+src - string inserted to string dst
+writes:
+dst - string into which we insert string src
 */
 void stringAppend(char *dst, const size_t offset, const char *src);
 /*
-odczytuje:
-path - ścieżka katalogu, w którym znajduje się podkatalog
-pathLength - długość w bajtach ścieżki katalogu
-subName - nazwa podkatalogu
-zapisuje:
-path - ścieżka podkatalogu
-zwraca:
-długość w bajtach ścieżki podkatalogu ze znakiem '/' na końcu
+Appends the name of a subdirectory to its parent directory path.
+reads:
+path - path of the directory containing the subdirectory named subName
+pathLength - length in bytes of path
+subName - name of the subdirectory
+writes:
+path - path of the subdirectory
+returns:
+length in bytes of the subdirectory path with character '/' at its end
 */
 size_t appendSubdirectoryName(char *path, const size_t pathLength, const char *subName);
 
 /*
-Analizuje opcje i argumenty przekazane do programu i zapisuje w swoich parametrach wartości gotowe do użycia.
-odczytuje:
-argc - liczba parametrów programu (opcji i argumentów razem)
-argv - parametry programu
-zapisuje:
-source - ścieżka katalogu źródłowego
-destination - ścieżka katalogu docelowego
-interval - czas spania w sekundach
-recursive - rekurecyjna synchronizacja katalogów
-threshold - minimalna wielkość pliku, żeby był traktowany jako duży (zapisuje w zmiennej globalnej)
-zwraca:
-< 0, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Analyzes options and arguments passed to the program and in its parameters writes values ready for use.
+reads:
+argc - number of program parameters (options and arguments together)
+argv - programu parameters
+writes:
+source - source directory path
+destination - target directory path
+interval - sleep time in seconds
+recursive - recursive directory synchronization (boolean)
+threshold - minimal file size to consider it big (this function stores threshold in a global variable)
+returns:
+< 0 if an error occured
+0 if no error occured
 */
 int parseParameters(int argc, char **argv, char **source, char **destination, unsigned int *interval, char *recursive);
 
 /*
-Sprawdza, czy katalog istnieje i jest gotowy do użycia.
-odczytuje:
-path - ścieżka katalogu
-zwraca:
--1, jeżeli wystąpił błąd podczas otwierania katalogu
--2, jeżeli wystąpił błąd podczas zamykania katalogu
-0, jeżeli nie wystąpił błąd
+Checks if a directory exists and is ready for use.
+reads:
+path - directory path
+returns:
+-1 if an error occured while opening the directory
+-2 if an error occured while closing the directory
+0 if no error occured
 */
 int directoryValid(const char *path);
 
 /*
-Obsługuje sygnał SIGUSR1.
-odczytuje:
-signo - numer obsługiwanego sygnału - zawsze SIGUSR1
+Handles signal SIGUSR1.
+reads:
+signo - number of the handled signal - always SIGUSR1
 */
 void sigusr1Handler(int signo);
 /*
-Obsługuje sygnał SIGTERM.
-odczytuje:
-signo - numer obsługiwanego sygnału - zawsze SIGTERM
+Handles signal SIGTERM.
+reads:
+signo - number of the handled signal - always SIGTERM
 */
 void sigtermHandler(int signo);
 
 /*
-Z procesu rodzicielskiego uruchamia proces potomny. Kończy proces rodzicielski. Przekształca proces potomny w demona. Wykonuje spanie i synchronizuje katalogi. Obsługuje sygnały.
-odczytuje:
-source - ścieżka katalogu źródłowego
-destination - ścieżka katalogu docelowego
-interval - czas spania w sekundach
-recursive - rekurecyjna synchronizacja katalogów
+Starts a child process from the parent process. Stops the parent process. Transforms the child process into a daemon. Sleeps and synchronizes directories. Handles signals.
+reads:
+source - source directory path
+destination - target directory path
+interval - sleep time in seconds
+recursive - recursive directory synchronization (boolean)
 */
 void runDaemon(char *source, char *destination, unsigned int interval, char recursive);
 
 /*
-Wypełnia listę plików katalogu dir.
-odczytuje:
-dir - strumień katalogu otwarty za pomocą opendir
-zapisuje:
-files - lista zwykłych plików znajdujących się w katalogu
-zwraca:
-< 0, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Fills the list of files of directory dir.
+reads:
+dir - directory stream opened with opendir
+writes:
+files - list of regular files located in dir
+returns:
+< 0 if an error occured
+0 if no error occured
 */
 int listFiles(DIR *dir, list *files);
 /*
-Wypełnia listy plików i podkatalogów katalogu dir.
-odczytuje:
-dir - strumień katalogu otwarty za pomocą opendir
-zapisuje:
-files - lista zwykłych plików znajdujących się w katalogu
-subdirs - lista podkatalogów znajdujących się w katalogu
-zwraca:
-< 0, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Fills the lists of files and subdirectories of directory dir.
+writes:
+dir - directory stream opened with opendir
+writes:
+files - list of regular files located in dir
+subdirs - list of subdirectories located in dir
+returns:
+< 0 if an error occured
+0 if no error occured
 */
 int listFilesAndDirectories(DIR *dir, list *files, list *subdirs);
 
 /*
-Tworzy pusty katalog.
-odczytuje:
-path - ścieżka katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-mode - uprawnienia utworzonego katalogu
-zwraca:
--1, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Creates an empty directory.
+reads:
+path - directory path, absolute or relative to the process' current working directory (cwd)
+mode - directory permissions
+returns:
+-1 if an error occured
+0 if no error occured
 */
 int createEmptyDirectory(const char *path, mode_t mode);
 /*
-Rekurencyjnie usuwa katalog.
-odczytuje:
-path - ścieżka katalogu bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-pathLength - długość ścieżki w bajtach
-zwraca:
-< 0, jeżeli wystąpił błąd krytyczny
-> 0, jeżeli wystąpił błąd niekrytyczny
-0, jeżeli nie wystąpił błąd
+Recursively removes a directory.
+reads:
+path - directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+pathLength - path length in bytes
+returns:
+< 0 if a critical error occured
+> 0 if a non-critical error occured
+0 if no error occured
 */
 int removeDirectoryRecursively(const char *path, const size_t pathLength);
 
 /*
-Kopiuje plik. Odczytuje plik źródłowy funkcją read i zapisuje plik docelowy funkcją write.
-odczytuje:
-srcFilePath - ścieżka pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-dstFilePath - ścieżka pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-dstMode - uprawnienia ustawiane plikowi docelowemu
-dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
-dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
-zwraca:
-< 0, jeżeli wystąpił błąd krytyczny
-> 0, jeżeli wystąpił błąd niekrytyczny
-0, jeżeli nie wystąpił błąd
+Copies a file. Reads the source file using read function and writes the target file using write function.
+reads:
+srcFilePath - source file path, absolute or relative to the process' current working directory (cwd)
+dstFilePath - target file path, absolute or relative to the process' current working directory (cwd)
+dstMode - permissions set on the target file
+dstAccessTime - last access time set to the target file
+dstModificationTime - last modification time set to the target file
+returns:
+< 0 if a critical error occured
+> 0 if a non-critical error occured
+0 if no error occured
 */
 int copySmallFile(const char *srcFilePath, const char *dstFilePath, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
 /*
-Kopiuje plik. Odczytuje plik źródłowy z pamięci odwzorowanej funkcją mmap i zapisuje plik docelowy funkcją write.
-odczytuje:
-srcFilePath - ścieżka pliku źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-dstFilePath - ścieżka pliku docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-fileSize - rozmiar w bajtach pliku źródłowego i docelowego po prawidłowym skopiowaniu
-dstMode - uprawnienia ustawiane plikowi docelowemu
-dstAccessTime - czas ostatniego dostępu ustawiany plikowi docelowemu
-dstModificationTime - czas ostatniej modyfikacji ustawiany plikowi docelowemu
-zwraca:
-< 0, jeżeli wystąpił błąd krytyczny
-> 0, jeżeli wystąpił błąd niekrytyczny
-0, jeżeli nie wystąpił błąd
+Copies a file. Reads the source file from memory mapped using mmap and writes the target file using write function.
+reads:
+srcFilePath - source file path, absolute or relative to the process' current working directory (cwd)
+dstFilePath - target file path, absolute or relative to the process' current working directory (cwd)
+dstMode - permissions set on the target file
+dstAccessTime - last access time set to the target file
+dstModificationTime - last modification time set to the target file
+returns:
+< 0 if a critical error occured
+> 0 if a non-critical error occured
+0 if no error occured
 */
 int copyBigFile(const char *srcFilePath, const char *dstFilePath, const unsigned long long fileSize, const mode_t dstMode, const struct timespec *dstAccessTime, const struct timespec *dstModificationTime);
 /*
-Usuwa plik.
-odczytuje:
-path - ścieżka pliku bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu
-zwraca:
--1, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Deletes a file.
+reads:
+path - file path, absolute or relative to the process' current working directory (cwd)
+returns:
+-1 if an error occured
+0 if no error occured
 */
 int removeFile(const char *path);
 
 /*
-Wykrywa różnice i aktualizuje pliki w katalogu docelowym. Jeżeli inode (i-węzeł, czyli fizyczny plik w pamięci masowej) ma w katalogu źródłowym więcej niż 1 nazwę (dowiązanie twarde, hard link), to do katalogu docelowego każdą nazwę kopiujemy jako oddzielny inode.
-odczytuje:
-srcDirPath - ścieżka katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-srcDirPathLength - długość w bajtach ścieżki katalogu źródłowego
-filesSrc - uporządkowana lista plików znajdujących się w katalogu źródłowym
-dstDirPath - ścieżka katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-dstDirPathLength - długość w bajtach ścieżki katalogu docelowego
-filesDst - lista plików znajdujących się w katalogu docelowym uporządkowana w takim samym porządku jak filesSrc
-zwraca:
-< 0, jeżeli wystąpił błąd uniemożliwiający sprawdzenie wszystkich plików
-> 0, jeżeli wystąpił przynajmniej 1 błąd uniemożliwiający operację na pliku
-0, jeżeli nie wystąpił błąd
+Detects differences and updates files in the target directory. If an inode (index node, a physical file in mass storage) has more than 1 name (hard link) in the source directory, then we copy every hard link as a separate file.
+reads:
+srcDirPath - source directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+srcDirPathLength - length in bytes of srcDirPath
+filesSrc - ordered (sorted) list of files located in source directory
+dstDirPath - target directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+dstDirPathLength - length in bytes of dstDirPath
+filesDst - in the same order as filesSrc list of files located in target directory
+returns:
+< 0 if an error occured which prevents from checking all files
+> 0 if an error occured which prevents from editing a file
+0 if no error occured
 */
 int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength, list *filesSrc, const char *dstDirPath, const size_t dstDirPathLength, list *filesDst);
 /*
-Wykrywa różnice i aktualizuje podkatalogi w katalogu docelowym.
-odczytuje:
-srcDirPath - ścieżka katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-srcDirPathLength - długość w bajtach ścieżki do katalogu źródłowego
-subdirsSrc - uporządkowana lista podkatalogów znajdujących się w katalogu źródłowym
-dstDirPath - ścieżka katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-dstDirPathLength - długość w bajtach ścieżki katalogu docelowego
-subdirsDst - lista podkatalogów znajdujących się w katalogu docelowym uporządkowana w takim samym porządku jak filesSrc
-zapisuje:
-isReady - tablica boolowska o długości równej liczbie podkatalogów w katalogu źródłowym; jeżeli i-ty podkatalog z listy subdirsSrc nie istnieje w katalogu docelowym oraz:
-- nie uda się go utworzyć, to isReady[i] == 0
-- uda się go utworzyć, to isReady[i] == 1
-zwraca:
-< 0, jeżeli wystąpił błąd uniemożliwiający sprawdzenie wszystkich podkatalogów
-> 0, jeżeli wystąpił przynajmniej 1 błąd uniemożliwiający utworzenie podkatalogu
-0, jeżeli nie wystąpił błąd
+Detects differences and updates subdirectories in the target directory.
+reads:
+srcDirPath - source directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+srcDirPathLength - length in bytes of srcDirPath
+subdirsSrc - ordered (sorted) list of subdirectories located in source directory
+dstDirPath - target directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+dstDirPathLength - length in bytes of dstDirPath
+subdirsDst - in the same order as subdirsSrc list of subdirectories located in target directory
+writes:
+isReady - boolean array with length equal to the number of subdirectories in source directory; if i-th subdirectory in list subdirsSrc does not exist in the target directory and:
+- creating it is unsuccessful, then isReady[i] == 0
+- creating it is successful, then isReady[i] == 1
+returns:
+< 0 if an error occured which prevents from checking all subdirectories
+> 0 if at least 1 error occured which prevents from creating a subdirectory
+0 if no error occured
 */
 int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPathLength, list *subdirsSrc, const char *dstDirPath, const size_t dstDirPathLength, list *subdirsDst, char *isReady);
 
 /*
-Nierekurencyjnie synchronizuje katalog źródłowy i docelowy.
-odczytuje:
-sourcePath - ścieżka katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-sourcePathLength - długość w bajtach ścieżki katalogu źródłowego
-destinationPath - ścieżka katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-destinationPathLength - długość w bajtach ścieżki katalogu docelowego
-zwraca:
-< 0, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Non-recursively synchronizes the source and target directories.
+reads:
+sourcePath - source directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+sourcePathLength - length in bytes of sourcePath
+destinationPath - target directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+destinationPathLength - length in bytes of destinationPath
+returns:
+< 0 if an error occured
+0 if no error occured
 */
 int synchronizeNonRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
 /*
-Rekurencyjnie synchronizuje katalog źródłowy i docelowy.
-odczytuje:
-sourcePath - ścieżka katalogu źródłowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-sourcePathLength - długość w bajtach ścieżki do katalogu źródłowego
-destinationPath - ścieżka katalogu docelowego bezwzględna lub względem aktualnego katalogu roboczego (cwd) procesu; musi być zakończona '/'
-destinationPathLength - długość w bajtach ścieżki do katalogu docelowego
-zwraca:
-< 0, jeżeli wystąpił błąd
-0, jeżeli nie wystąpił błąd
+Recursively synchronizes the source and target directories.
+reads:
+sourcePath - source directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+sourcePathLength - length in bytes of sourcePath
+destinationPath - target directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+destinationPathLength - length in bytes of destinationPath
+returns:
+< 0 if an error occured
+0 if no error occured
 */
 int synchronizeRecursively(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
 /*
-Wskaźnik na funkcję synchronizującą katalog źródłowy i docelowy.
+Pointer to a function synchronizing the source and target directories.
 */
 typedef int (*synchronizer)(const char *sourcePath, const size_t sourcePathLength, const char *destinationPath, const size_t destinationPathLength);
 
