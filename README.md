@@ -1,31 +1,36 @@
 # DirSyncD
-Demon okresowo synchronizujący 2 katalogi.
 
-Program, który otrzymuje co najmniej dwa argumenty: ścieżkę źródłową oraz ścieżkę docelową. Jeżeli któraś ze ścieżek nie jest katalogiem, program powraca natychmiast z komunikatem błędu. W przeciwnym wypadku staje się demonem. Demon wykonuje następujące czynności: śpi przez pięć minut (czas spania można zmieniać przy pomocy dodatkowego opcjonalnego argumentu), po czym po obudzeniu się porównuje katalog źródłowy z katalogiem docelowym. Pozycje które nie są zwykłymi plikami są ignorowane (np. katalogi i dowiązania symboliczne). Jeżeli demon  
-(a) napotka na nowy plik w katalogu źródłowym i tego pliku brak w katalogu docelowym lub  
-(b) plik w katalogu źrodłowym ma wcześniejszą lub późniejszą datę ostatniej modyfikacji,  
-demon wykonuje kopię pliku z katalogu źródłowego do katalogu docelowego, ustawiając w katalogu docelowym datę modyfikacji, tak aby przy kolejnym obudzeniu nie trzeba było wykonać kopii (chyba ze plik w katalogu źródłowym lub docelowym zostanie zmieniony). Jeżeli zaś demon odnajdzie plik w katalogu docelowym, którego nie ma w katalogu źródłowym, to usuwa ten plik z katalogu docelowego. Możliwe jest również natychmiastowe obudzenie się demona poprzez wysłanie mu sygnału SIGUSR1. Wyczerpująca informacja o każdej akcji typu uśpienie/obudzenie się demona (naturalne lub w wyniku sygnału), wykonanie kopii lub usunięcie pliku jest przesłana do logu systemowego. Informacja ta zawiera aktualną datę.
+## Operation
+DirSyncD is a daemon periodically synchronizing 2 directories. It demands two arguments: source and target paths. If any of the paths is not a directory, the program immediately exits printing an error message. Otherwise, it turns into a daemon. It sleeps for 5 minutes (the time can be changed using an additional option), after which it compares the source and target directories. Directory entries not being regular files are ignored (e.g. directories, symbolic links). If the daemon finds:
+- a new file in the source directory and that file is not present in the target directory or
+- a file in the source directory having modification time other than its equivalent in the target directory
 
-Dodatkowa opcja -R pozwalająca na rekurencyjną synchronizację katalogów (teraz pozycje będące katalogami nie są ignorowane). W szczególności jeżeli demon znajdzie w katalogu docelowym podkatalog, którego brak w katalogu źródłowym, powinien usunąć go wraz z zawartością.
+then the daemon copies the file from the source directory to the target directory. After that, it copies the modification time as well to prevent copying the same file on next wake-up (unless it is changed in either source or target directory). If the daemon finds a file in the target directory which is not present in the source directory, it deletes the file from the target directory. The daemon can be immediately woken up by sending signal SIGUSR1 to it. A comprehensive message about every daemon's action (e.g. falling asleep, waking up, copying or deleting a file) is sent to the system log (/var/log/syslog). Such a message contains the current time.
 
-W zależności od rozmiaru pliku: dla małych plików wykonywane jest kopiowanie przy pomocy read/write, a w przypadku dużych przy pomocy mmap/write - plik źródłowy zostaje zmapowany w całości w pamięci. Próg dzielący pliki małe od dużych może być przekazany jako opcjonalny argument.
+'-R' additional option enables recursive directory synchronization. In this case, directory entries being directories are not ignored. Notably, if the daemon finds a subdirectory in the target directory which is not present in the source directory, it deletes the subdirectory along with its content.
 
-Niezbędne argumenty:  
-sciezka_zrodlowa - ścieżka do katalogu, z którego kopiujemy  
-sciezka_docelowa - ścieżka do katalogu, do którego kopiujemy
+Small files are copied using read/write system calls and big files using mmap/write (the source file is entirely mapped in memory). Big file threshold for distinguishing between small and big files can be passed as additional option.
 
-Dodatkowe opcje:  
--i <czas_spania> - czas spania  
--R - rekurencyjna synchronizacja katalogów  
--t <prog_duzego_pliku> - minimalny rozmiar pliku, żeby był on potraktowany jako duży
+---
+## Usage
+Essential arguments:
+- `source_path` - path of the directory from which we copy
+- `target_path` - path of the directory to which we copy
 
-Sposób użycia:  
-DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa
+Additional options:
+- `-i <sleep_time>` - sleep time
+- `-R` - recursive directory synchronization
+- `-t <big_file_threshold>` - minimal file size to consider it big and copy it using mmap
 
-Wysłanie sygnału SIGUSR1 do demona:  
-- podczas spania - przedwczesne obudzenie  
-- podczas synchronizacji - wymuszenie ponownej synchronizacji natychmiast po zakończeniu aktualnej
+Usage:
+```
+DirSyncD [-i <sleep_time>] [-R] [-t <big_file_threshold>] source_path target_path
+```
 
-Wysłanie sygnału SIGTERM do demona:  
-- podczas spania - zakończenie demona  
-- podczas synchronizacji - zakończenie demona po zakończeniu synchronizacji, o ile podczas niej nie zostanie wysłany również SIGUSR1
+Send signal SIGUSR1 to the daemon:
+- during sleep - to prematurely wake it up.
+- during synchronization - to force it to repeat the synchronization immediately after finishing the current one.
+
+Send signal SIGTERM to the daemon:
+- during sleep - to stop it.
+- during synchronization - to force it to stop after finishing the current synchronization unless the daemon receives SIGUSR1 during it.
