@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     if (parseParameters(argc, argv, &source, &destination, &interval, &recursive) < 0)
     {
         // Print the correct way of using the program.
-        printf("sposob uzycia: DirSyncD [-i <czas_spania>] [-R] [-t <prog_duzego_pliku>] sciezka_zrodlowa sciezka_docelowa\n");
+        printf("Usage: DirSyncD [-i <sleep_time>] [-R] [-t <big_file_threshold>] source_path target_path\n");
         // Stop the parent process.
         return -1;
     }
@@ -296,19 +296,19 @@ int parseParameters(int argc, char **argv, char **source, char **destination, un
             break;
         case ':':
             // If option -i or -t was passed without its value, print message
-            printf("opcja wymaga podania wartosci\n");
+            printf("Option demands a value\n");
             // Return error code.
             return -4;
             break;
         case '?':
             // If option other than -R, -i, -t was specified
-            printf("nieznana opcja: %c\n", optopt);
+            printf("Unknown option: %c\n", optopt);
             // Return error code.
             return -5;
             break;
         default:
             // If getopt returned a value other than listed above (it should never happen)
-            printf("blad");
+            printf("Unknown error");
             // Return error code.
             return -6;
             break;
@@ -377,7 +377,7 @@ void runDaemon(char *source, char *destination, unsigned int interval, char recu
     else if (pid > 0)
     {
         // Being still in the parent process, print child process' PID.
-        printf("PID procesu potomnego: %i\n", pid);
+        printf("PID of the child process: %i\n", pid);
         // Stop the parent process with a status code indicating no errors.
         exit(0);
     }
@@ -505,7 +505,7 @@ void runDaemon(char *source, char *destination, unsigned int interval, char recu
                     // Open connection to log ('/var/log/syslog').
                     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
                     // In the log, write a message about sleep start.
-                    syslog(LOG_INFO, "uspienie");
+                    syslog(LOG_INFO, "falling asleep");
                     // Close the connection to the log.
                     closelog();
                     // Put the daemon to sleep.
@@ -513,7 +513,7 @@ void runDaemon(char *source, char *destination, unsigned int interval, char recu
                     // Open the connection to the log.
                     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
                     // In the log, write a message about waking up with sleep time in seconds.
-                    syslog(LOG_INFO, "obudzenie; przespano %u s", interval - timeLeft);
+                    syslog(LOG_INFO, "waking up; slept for %u s", interval - timeLeft);
                     // Close the connection to the log.
                     closelog();
                     // If sleep was interrupted by receiving SIGTERM
@@ -534,7 +534,7 @@ void runDaemon(char *source, char *destination, unsigned int interval, char recu
                 // Open the connection to the log.
                 openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
                 // In the log, write a message about finishing the synchronization with status code.
-                syslog(LOG_INFO, "koniec synchronizacji; %i", status);
+                syslog(LOG_INFO, "finishing synchronization; %i", status);
                 // Close the connection to the log.
                 closelog();
                 // Regardless of whether the synchronization was forced or automatic (after sleeping for the entire sleep time), set 0 after its finish.
@@ -570,7 +570,7 @@ void runDaemon(char *source, char *destination, unsigned int interval, char recu
     // Open connection to the log.
     openlog("DirSyncD", LOG_ODELAY | LOG_PID, LOG_DAEMON);
     // In the log, write a message about daemon stop with status code.
-    syslog(LOG_INFO, "zakonczenie; %i", ret);
+    syslog(LOG_INFO, "stopping; %i", ret);
     // Close the connection to the log.
     closelog();
     // Stop the daemon process.
@@ -1020,7 +1020,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
             // Remove the target file.
             status = removeFile(dstFilePath);
             // In the log, write a message about removal.
-            syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+            syslog(LOG_INFO, "deleting file %s; %i\n", dstFilePath, status);
             // If an error occured
             if (status != 0)
                 // Set a positive error code to indicate partial synchronization but do not break the loop.
@@ -1039,7 +1039,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                 if (comparison < 0)
                 {
                     // In the log, write a message about unsuccessful copying. The status code written to errno by stat is a positive number.
-                    syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
+                    syslog(LOG_INFO, "copying file %s to directory %s; %i\n", srcFilePath, dstDirPath, errno);
                     // Set an error code.
                     ret = 2;
                 }
@@ -1047,7 +1047,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                 else
                 {
                     // In the log, save a message about unsuccessful metadata reading.
-                    syslog(LOG_INFO, "odczytujemy metadane pliku źródłowego %s; %i\n", srcFilePath, errno);
+                    syslog(LOG_INFO, "reading metadata of source file %s; %i\n", srcFilePath, errno);
                     // Move the pointer to the next target file.
                     curD = curD->next;
                     // Set an error code.
@@ -1073,7 +1073,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                     // Copy it as a big file.
                     status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
                 // In the log, write a message about copying.
-                syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
+                syslog(LOG_INFO, "copying file %s to directory %s; %i\n", srcFilePath, dstDirPath, status);
                 // If an error occured
                 if (status != 0)
                     // Set an error code.
@@ -1090,7 +1090,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                 if (stat(dstFilePath, &dstFile) == -1)
                 {
                     // In the log, save a message about unsuccessful metadata reading.
-                    syslog(LOG_INFO, "odczytujemy metadane pliku docelowego %s; %i\n", dstFilePath, errno);
+                    syslog(LOG_INFO, "reading metadata of target file %s; %i\n", dstFilePath, errno);
                     // Set an error code.
                     ret = 5;
                 }
@@ -1107,7 +1107,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                         // Copy it as a big file.
                         status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
                     // In the log, write a message about copying.
-                    syslog(LOG_INFO, "przepisujemy %s do %s; %i\n", srcFilePath, dstFilePath, status);
+                    syslog(LOG_INFO, "writing %s to %s; %i\n", srcFilePath, dstFilePath, status);
                     // If an error occured
                     if (status != 0)
                         // Set an error code.
@@ -1129,7 +1129,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                         // Set status code equal to 0.
                         status = 0;
                     // In the log, write a message about copying permissions.
-                    syslog(LOG_INFO, "przepisujemy uprawnienia pliku %s do %s; %i\n", srcFilePath, dstFilePath, status);
+                    syslog(LOG_INFO, "copying permissions of file %s to %s; %i\n", srcFilePath, dstFilePath, status);
                 }
                 // Move the pointer to the next source file.
                 curS = curS->next;
@@ -1147,7 +1147,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
         // Remove the target file.
         status = removeFile(dstFilePath);
         // In the log, write a message about removal.
-        syslog(LOG_INFO, "usuwamy plik %s; %i\n", dstFilePath, status);
+        syslog(LOG_INFO, "deleting file %s; %i\n", dstFilePath, status);
         // If an error occured
         if (status != 0)
             // Set an error code.
@@ -1165,7 +1165,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
         if (stat(srcFilePath, &srcFile) == -1)
         {
             // In the log, write a message about unsuccessful copying.
-            syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, errno);
+            syslog(LOG_INFO, "copying file %s to directory %s; %i\n", srcFilePath, dstDirPath, errno);
             // Set an error code.
             ret = 9;
         }
@@ -1182,7 +1182,7 @@ int updateDestinationFiles(const char *srcDirPath, const size_t srcDirPathLength
                 // Copy it as a big file.
                 status = copyBigFile(srcFilePath, dstFilePath, srcFile.st_size, srcFile.st_mode, &srcFile.st_atim, &srcFile.st_mtim);
             // In the log, write a message about copying.
-            syslog(LOG_INFO, "kopiujemy plik %s do katalogu %s; %i\n", srcFilePath, dstDirPath, status);
+            syslog(LOG_INFO, "copying file %s to directory %s; %i\n", srcFilePath, dstDirPath, status);
             // If an error occured
             if (status != 0)
                 // Set an error code.
@@ -1240,7 +1240,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
             // Recursively remove the target subdirectory.
             status = removeDirectoryRecursively(dstSubdirPath, length);
             // In the log, write a message about removal.
-            syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstSubdirPath, status);
+            syslog(LOG_INFO, "deleting directory %s; %i\n", dstSubdirPath, status);
             // If an error occured
             if (status != 0)
                 // Set a positive error code to indicate partial synchronization but do not break the loop.
@@ -1259,7 +1259,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 if (comparison < 0)
                 {
                     // In the log, write a message about unsuccessful copying. The status code written to errno by stat is a positive number.
-                    syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, errno);
+                    syslog(LOG_INFO, "creating directory %s; %i\n", dstSubdirPath, errno);
                     // Indicate that the subdirectory is unready for synchronization because it does not exist.
                     isReady[i++] = 0;
                     // Set an error code.
@@ -1268,7 +1268,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 else
                 {
                     // In the log, save a message about unsuccessful metadata reading.
-                    syslog(LOG_INFO, "odczytujemy metadane katalogu źródłowego %s; %i\n", srcSubdirPath, errno);
+                    syslog(LOG_INFO, "reading metadata of source directory %s; %i\n", srcSubdirPath, errno);
                     // If we did not manage to check if source and target subdirectories have equal permissions, assume that they do. Indicate that the subdirectory is ready for synchronization.
                     isReady[i++] = 1;
                     // Set an error code.
@@ -1290,7 +1290,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 // In the target directory, create a subdirectory named the same as the source subdirectory. Copy permissions but do not copy modification time because we ignore it during synchronization - all subdirectories are browsed to detect file changes.
                 status = createEmptyDirectory(dstSubdirPath, srcSubdir.st_mode);
                 // In the log, write a meesage about creation.
-                syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, status);
+                syslog(LOG_INFO, "creating directory %s; %i\n", dstSubdirPath, status);
                 // If an error occured
                 if (status != 0)
                 {
@@ -1316,7 +1316,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                 if (stat(dstSubdirPath, &dstSubdir) == -1)
                 {
                     // In the log, save a message about unsuccessful metadata reading.
-                    syslog(LOG_INFO, "odczytujemy metadane katalogu docelowego %s; %i\n", dstSubdirPath, errno);
+                    syslog(LOG_INFO, "reading metadata of target directory %s; %i\n", dstSubdirPath, errno);
                     // Set an error code.
                     ret = 5;
                 }
@@ -1337,7 +1337,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
                         // Set status code equal to 0.
                         status = 0;
                     // In the log, write a message about copying permissions.
-                    syslog(LOG_INFO, "przepisujemy uprawnienia katalogu %s do %s; %i\n", srcSubdirPath, dstSubdirPath, status);
+                    syslog(LOG_INFO, "copying permissions of directory %s to %s; %i\n", srcSubdirPath, dstSubdirPath, status);
                 }
                 // Move the pointer to the next source subdirectory.
                 curS = curS->next;
@@ -1355,7 +1355,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
         // Recursively remove the target subdirectory.
         status = removeDirectoryRecursively(dstSubdirPath, length);
         // In the log, write a message about removal.
-        syslog(LOG_INFO, "usuwamy katalog %s; %i\n", dstSubdirPath, status);
+        syslog(LOG_INFO, "deleting directory %s; %i\n", dstSubdirPath, status);
         // If an error occured
         if (status != 0)
             // Set an error code.
@@ -1373,7 +1373,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
         if (stat(srcSubdirPath, &srcSubdir) == -1)
         {
             // In the log, write a message about unsuccessful creation.
-            syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, errno);
+            syslog(LOG_INFO, "creating directory %s; %i\n", dstSubdirPath, errno);
             // Indicate that the subdirectory is unready for synchronization because it does not exist.
             isReady[i++] = 0;
             // Set an error code.
@@ -1388,7 +1388,7 @@ int updateDestinationDirectories(const char *srcDirPath, const size_t srcDirPath
         // In the target directory, create a subdirectory named the same as the source subdirectory and copy permissions.
         status = createEmptyDirectory(dstSubdirPath, srcSubdir.st_mode);
         // In the log, write a message about creation.
-        syslog(LOG_INFO, "tworzymy katalog %s; %i\n", dstSubdirPath, status);
+        syslog(LOG_INFO, "creating directory %s; %i\n", dstSubdirPath, status);
         // If an error occured
         if (status != 0)
         {
