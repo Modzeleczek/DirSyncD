@@ -1,7 +1,9 @@
 # DirSyncD
 
 ## Operation
-DirSyncD is a daemon periodically synchronizing 2 directories. It demands two arguments: source and target paths. If any of the paths is not a directory, the program immediately exits printing an error message. Otherwise, it turns into a daemon. It sleeps for 5 minutes (the time can be changed using an additional option), after which it compares the source and target directories. Directory entries not being regular files are ignored (e.g. directories, symbolic links). If the daemon finds:
+DirSyncD is a daemon periodically synchronizing 2 directories. Daemon is a program running as a background process, rather than being under the direct control of an interactive user ([source](https://en.wikipedia.org/wiki/Daemon_(computing)), accessed 21.03.2023).
+
+DirSyncD demands two arguments: source and target paths. If any of the paths is not a directory, the program immediately exits printing an error message. Otherwise, it turns into a daemon. It sleeps for 5 minutes (the time can be changed using an additional option), after which it compares the source and target directories. Directory entries not being regular files are ignored (e.g. directories, symbolic links). If the daemon finds:
 - a new file in the source directory and that file is not present in the target directory or
 - a file in the source directory having modification time other than its equivalent in the target directory
 
