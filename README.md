@@ -1,5 +1,9 @@
 # DirSyncD
 
+## Code remark
+I am aware that this applications's code is heavily over-commented. To justify myself, this project was created 2 years ago and was supposed to be a product of teamwork but I wrote it all by myself. Then, I wanted my 'teammates' to know what was going on in the code in case they would be asked to present it to the lecturer. Therefore, I wrote a comment for virtually every line of code and after 2 years, I translated the whole project to English to preserve its consistency.
+
+---
 ## Operation
 DirSyncD is a daemon periodically synchronizing 2 directories. Daemon is a program running as a background process, rather than being under the direct control of an interactive user ([source](https://en.wikipedia.org/wiki/Daemon_(computing)), accessed 21.03.2023).
 
