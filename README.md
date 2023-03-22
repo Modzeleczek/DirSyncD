@@ -60,3 +60,110 @@ Send signal SIGUSR1 to the daemon process:
 Send signal SIGTERM to the daemon process:
 - during sleep - to stop it.
 - during synchronization - to force it to stop after finishing the current synchronization unless the daemon receives SIGUSR1 during it.
+
+---
+## Usage example
+`DirSyncD` project directory (without `.git` because it has hundreds of files that otherwise would be printed) is located in `~/test`. Empty `DirSyncD_backup` directory will be the target during synchronization.
+```
+modzel@Modzel-G710:~/test$ tree -a
+.
+├── DirSyncD
+│   ├── build
+│   │   ├── DirSyncD
+│   │   └── DirSyncD.o
+│   ├── build.sh
+│   ├── DirSyncD.c
+│   ├── DirSyncD.h
+│   ├── .gitignore
+│   ├── LICENSE
+│   ├── Makefile
+│   ├── README.md
+│   └── .vscode
+│       └── settings.json
+└── DirSyncD_backup
+
+4 directories, 10 files
+```
+
+`Diff` shows that all entries of `DirSyncD` are only there and not in `DirSyncD_backup`.
+```
+modzel@Modzel-G710:~/test$ diff -a -q -r DirSyncD DirSyncD_backup
+Only in DirSyncD: build
+Only in DirSyncD: build.sh
+Only in DirSyncD: DirSyncD.c
+Only in DirSyncD: DirSyncD.h
+Only in DirSyncD: .gitignore
+Only in DirSyncD: LICENSE
+Only in DirSyncD: Makefile
+Only in DirSyncD: README.md
+Only in DirSyncD: .vscode
+```
+
+On start, `DirSyncD` prints PID of the daemon process.
+```
+modzel@Modzel-G710:~/test$ ./DirSyncD/build/DirSyncD -R -i 60 DirSyncD/ DirSyncD_backup/
+PID of the child process: 26145
+```
+
+The daemon logs a start of sleep in `/var/log/syslog`.
+```
+Mar 22 00:18:33 Modzel-G710 DirSyncD[26145]: falling asleep
+```
+
+After 60 seconds of sleep, the daemon wakes up and performs a synchronization. It logs every operation's details and status code.
+```
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: waking up; slept for 60 s
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/.gitignore to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/DirSyncD.c to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/DirSyncD.h to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/LICENSE to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/Makefile to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/README.md to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/build.sh to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: creating directory /home/modzel/test/DirSyncD_backup/.vscode; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: creating directory /home/modzel/test/DirSyncD_backup/build; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/.vscode/settings.json to directory /home/modzel/test/DirSyncD_backup/.vscode/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/build/DirSyncD to directory /home/modzel/test/DirSyncD_backup/build/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/build/DirSyncD.o to directory /home/modzel/test/DirSyncD_backup/build/; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: finishing synchronization; 0
+Mar 22 00:19:33 Modzel-G710 DirSyncD[26145]: falling asleep
+```
+
+After the synchronization, `diff` shows nothing.
+```
+modzel@Modzel-G710:~/test$ diff -a -q -r DirSyncD DirSyncD_backup
+```
+
+To test the synchronization again, in the source directory we edit `DirSyncD.c`, create `new_file` and delete `README.md`.
+```
+modzel@Modzel-G710:~/test$ diff -a -q -r DirSyncD DirSyncD_backup
+Files DirSyncD/DirSyncD.c and DirSyncD_backup/DirSyncD.c differ
+Only in DirSyncD: new_file
+Only in DirSyncD_backup: README.md
+```
+
+We send SIGUSR1 signal to the daemon.
+```
+modzel@Modzel-G710:~/test$ kill -SIGUSR1 26145
+```
+
+It prematurely wakes up and performs an incremental synchronization.
+```
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: waking up; slept for 54 s
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: writing /home/modzel/test/DirSyncD/DirSyncD.c to /home/modzel/test/DirSyncD_backup/DirSyncD.c; 0
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: deleting file /home/modzel/test/DirSyncD_backup/README.md; 0
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: copying file /home/modzel/test/DirSyncD/new_file to directory /home/modzel/test/DirSyncD_backup/; 0
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: finishing synchronization; 0
+Mar 22 00:20:26 Modzel-G710 DirSyncD[26145]: falling asleep
+```
+
+Finally, we send SIGTERM to the daemon.
+```
+modzel@Modzel-G710:~/test$ kill -SIGTERM 26145
+```
+
+It wakes up and stops.
+```
+Mar 22 00:20:45 Modzel-G710 DirSyncD[26145]: waking up; slept for 19 s
+Mar 22 00:20:45 Modzel-G710 DirSyncD[26145]: stopping; 0
+```
