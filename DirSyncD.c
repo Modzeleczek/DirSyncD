@@ -72,26 +72,12 @@ int main(int argc, char **argv)
     return 0;
 }
 
-struct element
-{
-    // Next list node.
-    element *next;
-    // Pointer to a directory entry (file or subdirectory).
-    struct dirent *entry;
-};
 int cmp(element *a, element *b)
 {
     // Function comparing list nodes (lexicographic order).
     return strcmp(a->entry->d_name, b->entry->d_name);
 }
 
-struct list
-{
-    // The first and last nodes. Save a pointer to the last node to add new nodes to the list in constant time.
-    element *first, *last;
-    // Number of list nodes.
-    unsigned int count;
-};
 void initialize(list *l)
 {
     // Set pointers to the first and last nodes to NULL.

@@ -8,7 +8,13 @@ typedef struct element element;
 /*
 Singly linked list node storing pointers to a directory entry and to next list node.
 */
-struct element;
+struct element
+{
+    // Next list node.
+    element *next;
+    // Pointer to a directory entry (file or subdirectory).
+    struct dirent *entry;
+};
 /*
 Compares nodes of a singly linked list.
 reads:
@@ -25,7 +31,13 @@ typedef struct list list;
 /*
 Singly linked list. In functions operating on a list, we assume that a valid pointer to it is given.
 */
-struct list;
+struct list
+{
+    // The first and last nodes. Save a pointer to the last node to add new nodes to the list in constant time.
+    element *first, *last;
+    // Number of list nodes.
+    unsigned int count;
+};
 /*
 Initializes the singly linked list.
 writes:
