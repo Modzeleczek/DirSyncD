@@ -26,7 +26,7 @@ for path in $SOURCE
 do
   path_wo_ext=$(echo $path | sed 's|.c\>||')
   # Equivalent to 'dirname' command.
-  dir_name=$(echo $path_wo_ext | sed 's|^\(.*\)/\(.*\)$|\1|')
+  dir_name=$(echo $path_wo_ext | sed 's|/[^/]*$||')
 
   mkdir -p $BUILD/$dir_name
   check_error
