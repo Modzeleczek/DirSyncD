@@ -78,7 +78,7 @@ Send signal SIGTERM to the daemon process:
 
 ---
 ## Usage example
-`DirSyncD` project directory (without `.git` because it has hundreds of files that otherwise would be printed) is located in `~/test`. Empty `DirSyncD_backup` directory will be the target during synchronization.
+A simplified `DirSyncD` project directory is located in `~/test`. Empty `DirSyncD_backup` directory will be the target during synchronization.
 ```
 modzel@Modzel-G710:~/test$ tree -a
 .
