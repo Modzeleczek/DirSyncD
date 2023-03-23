@@ -3,14 +3,15 @@
 
 typedef struct element element;
 /*
-Singly linked list node storing pointers to a directory entry and to next list node.
+Singly linked list node storing pointers to a directory entry
+  and to next list node.
 */
 struct element
 {
-    // Next list node.
-    element *next;
-    // Pointer to a directory entry (file or subdirectory).
-    struct dirent *entry;
+  // Next list node.
+  element *next;
+  // Pointer to a directory entry (file or subdirectory).
+  struct dirent *entry;
 };
 
 /*
@@ -27,14 +28,16 @@ int cmp(element *a, element *b);
 
 typedef struct list list;
 /*
-Singly linked list. In functions operating on a list, we assume that a valid pointer to it is given.
+Singly linked list. In functions operating on a list,
+  we assume that a valid pointer to it is given.
 */
 struct list
 {
-    // The first and last nodes. Save a pointer to the last node to add new nodes to the list in constant time.
-    element *first, *last;
-    // Number of list nodes.
-    unsigned int count;
+  /* The first and last nodes. Save a pointer to the last node to add new nodes
+  to the list in constant time. */
+  element *first, *last;
+  // Number of list nodes.
+  unsigned int count;
 };
 
 /*
@@ -85,7 +88,8 @@ void clear(list *l);
  * SOFTWARE.
  */
 /*
-Sorts by merging the singly linked list. This function contains author's original comments.
+Sorts by merging the singly linked list. This function contains
+  author's original comments.
 writes:
 l - singly linked list sorted using cmp function comparing nodes
 */

@@ -73,7 +73,8 @@ void listMergeSort(list *l)
 {
   element *p, *q, *e, *tail, *list = l->first;
   int insize, nmerges, psize, qsize, i;
-  if (list == NULL) // Silly special case: if `list' was passed in as NULL, return immediately.
+  // Silly special case: if `list' was passed in as NULL, return immediately.
+  if (list == NULL)
     return;
   insize = 1;
   while (1)

@@ -24,6 +24,7 @@ path - path of the subdirectory
 returns:
 length in bytes of the subdirectory path with character '/' at its end
 */
-size_t appendSubdirectoryName(char *path, const size_t pathLength, const char *subName);
+size_t appendSubdirectoryName(char *path, const size_t pathLength,
+  const char *subName);
 
 #endif // PATH_H

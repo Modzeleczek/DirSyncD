@@ -20,7 +20,8 @@ int directoryValid(const char *path);
 /*
 Creates an empty directory.
 reads:
-path - directory path, absolute or relative to the process' current working directory (cwd)
+path - directory path, absolute or relative to the process'
+  current working directory (cwd)
 mode - directory permissions
 returns:
 -1 if an error occured
@@ -31,7 +32,8 @@ int createEmptyDirectory(const char *path, mode_t mode);
 /*
 Recursively removes a directory.
 reads:
-path - directory path, absolute or relative to the process' current working directory (cwd); must end with '/'
+path - directory path, absolute or relative to the process'
+  current working directory (cwd); must end with '/'
 pathLength - path length in bytes
 returns:
 < 0 if a critical error occured
