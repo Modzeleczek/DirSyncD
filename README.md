@@ -19,17 +19,32 @@ Small files are copied using read/write system calls and big files using mmap/wr
 
 ---
 ## Building
-DirSyncD only uses Linux system calls and C standard library functions without any external dependencies. To build it, firstly clone this repository. Make sure you have `gcc` (GNU Compiler Collection) and `make` (GNU Make) available. Build the application using the following command:
-```
-make DirSyncD
-```
+DirSyncD only uses Linux system calls and C standard library functions without any external dependencies. To build it, firstly clone this repository. Make sure you have `gcc` (GNU Compiler Collection) available. Then you have two options:
+1. If `make` (GNU Make) is available, build the application using the following command:
+    ```
+    make DirSyncD
+    ```
 
-Compiled executable `DirSyncD` is placed in `./build` directory.
+or
+
+2. Permit execution of build.sh Bash script and run it:
+    ```
+    chmod 755 build.sh
+    ./build.sh
+    ```
+
+Either way, compiled executable `DirSyncD` is placed in `./build` directory.
 
 To delete `./build`, use:
-```
-make clean
-```
+1.  ```
+    make clean
+    ```
+
+or
+
+2.  ```
+    rm -r ./build
+    ```
 
 ---
 ## Running
